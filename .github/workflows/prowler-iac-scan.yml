@@ -1,0 +1,29 @@
+name: Prowler IaC Scan
+
+on:
+  pull_request:
+    paths:
+      - 'shared-infrastructure/**'
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  prowler:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@<pin-to-a-commit-sha>
+
+      - uses: prowler-cloud/prowler@<pin-to-a-commit-sha>
+        with:
+          provider: iac
+          output-formats: sarif json-ocsf
+          upload-sarif: true
+
+      - name: Upload SARIF to GitHub Code Scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@<pin-to-a-commit-sha>
+        with:
+          sarif_file: output
