@@ -1,0 +1,21 @@
+# digger.yml (repo root)
+projects:
+  - name: shared-infrastructure-azure
+    dir: shared-infrastructure/azure
+    workflow: default
+
+  - name: shared-infrastructure-gcp
+    dir: shared-infrastructure/gcp
+    workflow: default
+
+workflows:
+  default:
+    plan:
+      steps:
+        - init
+        - plan
+        - run: infracost breakdown --path=. | tee -a $DIGGER_OUT
+    apply:
+      steps:
+        - init
+        - apply
