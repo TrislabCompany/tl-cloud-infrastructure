@@ -1,4 +1,4 @@
-# .github/workflows/digger.yml
+# .github/workflows/digger_workflow.yml
 name: Digger Workflow
 
 on:
