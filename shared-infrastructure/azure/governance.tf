@@ -35,3 +35,51 @@ resource "azurerm_management_group_policy_assignment" "allowed_locations" {
     }
   })
 }
+
+# FinOps action group and shared-infra budget — Phase 5, Step 3.
+resource "azurerm_resource_group" "governance" {
+  name     = "rg-tl-shared-infra-governance-neu"
+  location = "northeurope"
+
+  tags = local.mandatory_tags
+}
+
+resource "azurerm_monitor_action_group" "finops_email" {
+  name                = "ag-tl-finops-email"
+  resource_group_name = azurerm_resource_group.governance.name
+  short_name          = "tlfinops" # 12-char limit, alphanumeric only — see NAMING-CONVENTIONS.md's ag row
+
+  email_receiver {
+    name                    = "finops-mailbox"
+    email_address           = "finops@trislab.si"
+    use_common_alert_schema = true
+  }
+
+  tags = local.mandatory_tags
+}
+
+resource "azurerm_consumption_budget_subscription" "shared_infra" {
+  name            = "budget-tl-shared-infra-azure"
+  subscription_id = "/subscriptions/${var.azure_subscription_id}"
+
+  amount     = 200
+  time_grain = "Monthly"
+
+  time_period {
+    start_date = "2026-10-01T00:00:00Z" # first of next month at apply time — see step-03-cost-management.md troubleshooting
+  }
+
+  notification {
+    enabled        = true
+    threshold      = 80
+    operator       = "GreaterThan"
+    contact_groups = [azurerm_monitor_action_group.finops_email.id]
+  }
+
+  notification {
+    enabled        = true
+    threshold      = 100
+    operator       = "GreaterThan"
+    contact_groups = [azurerm_monitor_action_group.finops_email.id]
+  }
+}
