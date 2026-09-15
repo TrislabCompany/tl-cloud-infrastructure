@@ -24,6 +24,7 @@ resource "azurerm_key_vault" "shared_infra" {
   # Temporarily open — see step-05-key-vault.md for why "Deny" blocks the
   # apply identity today and the plan to revert this once Phase 6's Private
   # Endpoint exists. RBAC (not network) still gates who can read/write secrets.
+  # trivy:ignore:AVD-AZU-0013 known/accepted, see step-05-key-vault.md
   network_acls {
     default_action = "Allow"
     bypass         = "AzureServices"
