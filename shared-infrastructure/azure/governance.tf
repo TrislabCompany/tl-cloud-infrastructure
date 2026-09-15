@@ -40,6 +40,13 @@ resource "azurerm_management_group_policy_assignment" "allowed_locations" {
 resource "azurerm_resource_group" "governance" {
   name     = "rg-tl-shared-infra-governance-neu"
   location = "northeurope"
+
+  tags = {
+    Customer        = "trislab"
+    Product         = "shared-infra"
+    Environment     = "production"
+    EnvironmentName = "prod"
+  }
 }
 
 resource "azurerm_monitor_action_group" "finops_email" {
@@ -51,6 +58,13 @@ resource "azurerm_monitor_action_group" "finops_email" {
     name                    = "finops-mailbox"
     email_address           = "finops@trislab.si"
     use_common_alert_schema = true
+  }
+
+  tags = {
+    Customer        = "trislab"
+    Product         = "shared-infra"
+    Environment     = "production"
+    EnvironmentName = "prod"
   }
 }
 
