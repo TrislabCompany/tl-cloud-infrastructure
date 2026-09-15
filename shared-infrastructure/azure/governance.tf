@@ -1,3 +1,4 @@
+# Management group hierarchy and guardrail policy for the TL tenant.
 resource "azurerm_management_group" "tl" {
   name         = "mg-tl"
   display_name = "TL"
