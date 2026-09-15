@@ -1,6 +1,6 @@
 # shared-infrastructure/azure/secrets.tf
-# Cosmetic touch: force a plan/apply cycle now that apply_requirements: [] lets
-# on_commit_to_default's apply actually run post-merge.
+# Cosmetic touch: force a fresh plan so "digger apply" can be run on this PR
+# BEFORE merging (see digger.yml for why apply-on-merge doesn't work here).
 
 # Infracost's FinOps tagging policy (Governance > Tagging policies) wants Environment
 # title-cased and a Company tag, which NAMING-CONVENTIONS.md doesn't otherwise require —
