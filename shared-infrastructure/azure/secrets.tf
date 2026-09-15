@@ -21,8 +21,11 @@ resource "azurerm_key_vault" "shared_infra" {
   soft_delete_retention_days = 90
   purge_protection_enabled   = true
 
+  # Temporarily open — see step-05-key-vault.md for why "Deny" blocks the
+  # apply identity today and the plan to revert this once Phase 6's Private
+  # Endpoint exists. RBAC (not network) still gates who can read/write secrets.
   network_acls {
-    default_action = "Deny"
+    default_action = "Allow"
     bypass         = "AzureServices"
   }
 
