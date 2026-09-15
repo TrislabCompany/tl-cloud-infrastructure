@@ -41,12 +41,7 @@ resource "azurerm_resource_group" "governance" {
   name     = "rg-tl-shared-infra-governance-neu"
   location = "northeurope"
 
-  tags = {
-    Customer        = "trislab"
-    Product         = "shared-infra"
-    Environment     = "production"
-    EnvironmentName = "prod"
-  }
+  tags = local.mandatory_tags
 }
 
 resource "azurerm_monitor_action_group" "finops_email" {
@@ -60,12 +55,7 @@ resource "azurerm_monitor_action_group" "finops_email" {
     use_common_alert_schema = true
   }
 
-  tags = {
-    Customer        = "trislab"
-    Product         = "shared-infra"
-    Environment     = "production"
-    EnvironmentName = "prod"
-  }
+  tags = local.mandatory_tags
 }
 
 resource "azurerm_consumption_budget_subscription" "shared_infra" {
