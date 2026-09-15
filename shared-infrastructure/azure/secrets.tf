@@ -37,23 +37,14 @@ resource "azurerm_role_assignment" "devops_secrets_officer" {
   principal_id         = azuread_group.devops.object_id
 }
 
-# The Digger apply identity itself (spn-tl-github-sharedinfra-azure-apply) also needs a
-# data-plane role on this vault: enable_rbac_authorization means its Contributor grant on
-# mg-tl-shared-infra (management plane only) doesn't cover secrets.getSecret/setSecret, so
-# without this the apply that creates the vault fails to then create the secret below
-# (403 ForbiddenByRbac).
-data "azuread_service_principal" "apply_identity" {
-  client_id = "01c8452f-a291-47d8-ba0f-3f1a358c094d" # spn-tl-github-sharedinfra-azure-apply
-}
-
+# Apply identity's own data-plane grant on this vault — see step-05-key-vault.md for why.
 resource "azurerm_role_assignment" "apply_identity_secrets_officer" {
   scope                = azurerm_key_vault.shared_infra.id
   role_definition_name = "Key Vault Secrets Officer"
-  principal_id         = data.azuread_service_principal.apply_identity.object_id
+  principal_id         = local.apply_identity_object_id
 }
 
-# RBAC role assignments can take up to a couple of minutes to propagate to the Key Vault
-# data plane, so give it a moment before the first secret operation depending on it.
+# Wait for RBAC propagation before the first secret operation depending on it.
 resource "time_sleep" "wait_for_apply_identity_rbac" {
   depends_on      = [azurerm_role_assignment.apply_identity_secrets_officer]
   create_duration = "30s"
