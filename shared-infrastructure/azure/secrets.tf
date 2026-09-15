@@ -1,5 +1,5 @@
 # shared-infrastructure/azure/secrets.tf
-# Cosmetic touch: force a plan/apply cycle for #13, which merged without an apply run.
+# Cosmetic touch: force a plan/apply cycle now that Digger is apply-on-merge again (#15).
 
 # Infracost's FinOps tagging policy (Governance > Tagging policies) wants Environment
 # title-cased and a Company tag, which NAMING-CONVENTIONS.md doesn't otherwise require —
