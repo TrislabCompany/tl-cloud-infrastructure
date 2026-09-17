@@ -1,0 +1,86 @@
+# .github/workflows/tofu-drift.yml
+#
+# Nightly check for manual ("Click-Ops") changes made outside a PR. Uses the
+# plan (read-only) identity — drift detection never applies anything. No
+# external alerting channel exists yet, so a detected drift opens/updates a
+# GitHub Issue rather than paging anyone.
+name: Tofu Drift Detection
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+
+jobs:
+  drift:
+    name: drift (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - project: azure
+            dir: shared-infrastructure/azure
+          - project: gcp
+            dir: shared-infrastructure/gcp
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: azure/login@7ddb5af1ef8758cf1353cf3b42f940aee27ba21c # v3.0.2
+        if: matrix.project == 'azure'
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID_PLAN }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        if: matrix.project == 'gcp'
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT_PLAN }}
+
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: 1.12.6
+
+      - name: tofu plan -detailed-exitcode
+        id: plan
+        working-directory: ${{ matrix.dir }}
+        env:
+          TF_VAR_azure_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          TF_VAR_gcp_project_id: ${{ vars.GCP_PROJECT_ID }}
+          ARM_USE_OIDC: true
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID_PLAN }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          tofu init -input=false
+          set +e
+          tofu plan -input=false -detailed-exitcode -out=/dev/null | tee plan.txt
+          echo "exitcode=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Open/update drift issue
+        if: steps.plan.outputs.exitcode == '2'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const plan = fs.readFileSync(path.join('${{ matrix.dir }}', 'plan.txt'), 'utf8');
+            const title = `Drift detected: ${{ matrix.project }}`;
+            const label = 'drift';
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo, state: 'open', labels: label,
+            });
+            const existing = issues.find(i => i.title === title);
+            const body = `Detected on ${new Date().toISOString()} by the nightly drift-detection workflow.\n\n<details><summary>Plan</summary>\n\n\`\`\`\n${plan}\n\`\`\`\n</details>`;
+            if (existing) {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: existing.number, body });
+            } else {
+              await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo, title, body, labels: [label] });
+            }
