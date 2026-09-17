@@ -48,9 +48,17 @@ resource "azurerm_role_assignment" "apply_identity_secrets_officer" {
   principal_id         = local.apply_identity_object_id
 }
 
+# Read-only grant so `tofu plan` can refresh azurerm_key_vault_secret.break_glass_credential's
+# state without erroring — the plan identity never needs to write secrets, only read them.
+resource "azurerm_role_assignment" "plan_identity_secrets_user" {
+  scope                = azurerm_key_vault.shared_infra.id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = local.plan_identity_object_id
+}
+
 # Wait for RBAC propagation before the first secret operation depending on it.
 resource "time_sleep" "wait_for_apply_identity_rbac" {
-  depends_on      = [azurerm_role_assignment.apply_identity_secrets_officer]
+  depends_on      = [azurerm_role_assignment.apply_identity_secrets_officer, azurerm_role_assignment.plan_identity_secrets_user]
   create_duration = "30s"
 }
 

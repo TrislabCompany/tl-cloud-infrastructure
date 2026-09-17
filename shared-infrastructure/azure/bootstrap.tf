@@ -6,6 +6,7 @@
 
 locals {
   apply_identity_object_id = "32663278-c02d-40c7-953d-4529e9c13d57" # spn-tl-github-sharedinfra-azure-apply
+  plan_identity_object_id  = "8a96aa47-d55f-4f90-881d-0bcae8477967" # spn-tl-github-sharedinfra-azure-plan
 
   privileged_role_definition_ids = [
     "8e3af657-a8ff-443c-a75c-2fe8c4bcb635", # Owner
