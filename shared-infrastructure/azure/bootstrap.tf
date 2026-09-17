@@ -19,9 +19,9 @@ locals {
 resource "azurerm_role_assignment" "apply_identity_rbac_administrator" {
   scope                = azurerm_management_group.tl.id
   role_definition_name = "Role Based Access Control Administrator"
-  principal_id          = local.apply_identity_object_id
-  condition             = local.no_privilege_escalation_condition
-  condition_version     = "2.0"
+  principal_id         = local.apply_identity_object_id
+  condition            = local.no_privilege_escalation_condition
+  condition_version    = "2.0"
 }
 
 resource "azurerm_role_assignment" "apply_identity_resource_policy_contributor" {
