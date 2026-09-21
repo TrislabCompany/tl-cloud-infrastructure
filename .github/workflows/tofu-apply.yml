@@ -7,6 +7,15 @@
 # matching tofu-plan.yml run already produced, located by the PR's head SHA
 # (recorded on the run regardless of whether the branch still exists) and
 # downloaded by run id (artifacts live on the run, not the branch).
+#
+# GCP temporarily disabled (matrix below is azure-only) — this pipeline
+# currently can't produce a GCP plan artifact to apply at all (tofu-plan.yml's
+# gcp leg is disabled for the same reason, see there), so this leg would have
+# nothing to download regardless of whether the apply identity's own
+# permissions are fine. Not independently verified broken/fixed — disabled as
+# a consequence of tofu-plan.yml's gcp leg being disabled, not a new finding.
+# See docs/spec/phase-04-cicd-enablement/step-05-drift-detection.md and
+# docs/spec/phase-03-automation-identities/step-03-gcp-service-accounts.md.
 name: Tofu Apply
 
 on:
@@ -31,8 +40,6 @@ jobs:
         include:
           - project: azure
             dir: shared-infrastructure/azure
-          - project: gcp
-            dir: shared-infrastructure/gcp
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
