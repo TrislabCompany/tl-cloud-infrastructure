@@ -7,13 +7,20 @@
 # docs/spec/phase-04-cicd-enablement/.
 #
 # Deliberately NOT filtered with `on.pull_request.paths: shared-infrastructure/**`
-# — branch protection requires the `plan (azure)`/`plan (gcp)` checks
-# unconditionally to merge (Phase 4 Step 4), and a path-filtered trigger means
-# this workflow, and therefore those checks, never even run on a PR that doesn't
-# touch that path — leaving the check "Expected" forever and blocking every such
-# PR from merging. The "Check for changes" step below does the path filtering
-# instead, entirely inside the job, so the check itself always reports
-# (skipping the actual plan work when irrelevant) rather than never reporting.
+# — branch protection requires the `plan (azure)` check unconditionally to merge
+# (Phase 4 Step 4), and a path-filtered trigger means this workflow, and
+# therefore that check, never even runs on a PR that doesn't touch that path —
+# leaving the check "Expected" forever and blocking every such PR from merging.
+# The "Check for changes" step below does the path filtering instead, entirely
+# inside the job, so the check itself always reports (skipping the actual plan
+# work when irrelevant) rather than never reporting.
+#
+# GCP temporarily disabled (matrix below is azure-only; `plan (gcp)` removed
+# from required status checks to match) — the plan identity's roles/viewer
+# can't write the GCS lock object tofu plan needs even for a read-only plan.
+# Same root cause as tofu-drift.yml's gcp leg being disabled; see
+# docs/spec/phase-04-cicd-enablement/step-05-drift-detection.md and
+# docs/spec/phase-03-automation-identities/step-03-gcp-service-accounts.md.
 name: Tofu Plan
 
 on:
@@ -34,8 +41,6 @@ jobs:
         include:
           - project: azure
             dir: shared-infrastructure/azure
-          - project: gcp
-            dir: shared-infrastructure/gcp
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
