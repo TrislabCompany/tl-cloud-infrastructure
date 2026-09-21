@@ -1,16 +1,23 @@
 # .github/workflows/tofu-plan.yml
 #
-# Runs on every PR that touches shared-infrastructure/{azure,gcp} — no external
-# orchestrator, no workflow_dispatch indirection. A native `pull_request` trigger
-# gives GitHub's own OIDC token the subject shape its docs actually promise
-# (`repo:<org>/<repo>:pull_request`), which is what the plan identity's federated
-# credential / WIF binding trusts. See docs/spec/phase-04-cicd-enablement/.
+# Runs on every PR — no external orchestrator, no workflow_dispatch indirection.
+# A native `pull_request` trigger gives GitHub's own OIDC token the subject shape
+# its docs actually promise (`repo:<org>/<repo>:pull_request`), which is what the
+# plan identity's federated credential / WIF binding trusts. See
+# docs/spec/phase-04-cicd-enablement/.
+#
+# Deliberately NOT filtered with `on.pull_request.paths: shared-infrastructure/**`
+# — branch protection requires the `plan (azure)`/`plan (gcp)` checks
+# unconditionally to merge (Phase 4 Step 4), and a path-filtered trigger means
+# this workflow, and therefore those checks, never even run on a PR that doesn't
+# touch that path — leaving the check "Expected" forever and blocking every such
+# PR from merging. The "Check for changes" step below does the path filtering
+# instead, entirely inside the job, so the check itself always reports
+# (skipping the actual plan work when irrelevant) rather than never reporting.
 name: Tofu Plan
 
 on:
-  pull_request:
-    paths:
-      - 'shared-infrastructure/**'
+  pull_request: {}
 
 permissions:
   contents: read
