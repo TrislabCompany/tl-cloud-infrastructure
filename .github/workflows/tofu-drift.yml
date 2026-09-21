@@ -59,6 +59,7 @@ jobs:
           ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
         run: |
+          set -o pipefail
           tofu init -input=false
           set +e
           tofu plan -input=false -detailed-exitcode -out=/dev/null | tee plan.txt
