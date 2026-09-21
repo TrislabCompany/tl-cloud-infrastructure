@@ -4,6 +4,16 @@
 # plan (read-only) identity — drift detection never applies anything. No
 # external alerting channel exists yet, so a detected drift opens/updates a
 # GitHub Issue rather than paging anyone.
+#
+# GCP temporarily disabled (matrix below is azure-only): the WIF auth/
+# impersonation issue is fixed (environment: azure-gcp-plan, see git history),
+# but tofu plan still fails past that — GCS native locking needs
+# storage.objects.create on the state bucket to write the lock object, even
+# for a read-only plan, and the plan identity only has project-wide
+# roles/viewer (no bucket-level grant beyond the legacy IAM the bucket
+# inherited from its own creation). Needs a scoped bucket-level role (or a
+# `-lock=false` plan, which trades away real lock safety) before re-enabling.
+# See docs/spec/phase-04-cicd-enablement/step-05-drift-detection.md.
 name: Tofu Drift Detection
 
 on:
@@ -20,24 +30,12 @@ jobs:
   drift:
     name: drift (${{ matrix.project }})
     runs-on: ubuntu-latest
-    # GCP's workload-identity binding for this identity is scoped to
-    # attribute.environment/azure-gcp-plan (not attribute.ref) — this job
-    # must run under that GitHub Environment for the gcp leg, or
-    # google-github-actions/auth's later impersonation call gets
-    # PERMISSION_DENIED on iam.serviceAccounts.getAccessToken. The azure leg
-    # carries no environment (matrix.environment empty), matching the azure
-    # plan identity's ref:refs/heads/main-subject federated credential
-    # (see docs/spec/phase-03-automation-identities/step-01-azure-identities.md).
-    environment: ${{ matrix.environment }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - project: azure
             dir: shared-infrastructure/azure
-          - project: gcp
-            dir: shared-infrastructure/gcp
-            environment: azure-gcp-plan
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
