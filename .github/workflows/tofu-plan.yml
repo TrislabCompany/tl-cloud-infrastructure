@@ -28,6 +28,14 @@ jobs:
   plan:
     name: plan (${{ matrix.project }})
     runs-on: ubuntu-latest
+    # GCP's workload-identity binding for this identity is scoped to
+    # attribute.environment/azure-gcp-plan (not attribute.ref) — this job
+    # must run under that GitHub Environment for the gcp leg, or
+    # google-github-actions/auth's later impersonation call gets
+    # PERMISSION_DENIED on iam.serviceAccounts.getAccessToken. The azure leg
+    # carries no environment (matrix.environment empty), matching the azure
+    # plan identity's plain `pull_request`-subject federated credential.
+    environment: ${{ matrix.environment }}
     strategy:
       fail-fast: false
       matrix:
@@ -36,6 +44,7 @@ jobs:
             dir: shared-infrastructure/azure
           - project: gcp
             dir: shared-infrastructure/gcp
+            environment: azure-gcp-plan
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
