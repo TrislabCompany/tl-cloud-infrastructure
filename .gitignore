@@ -1,5 +1,5 @@
 docs/runbooks/
-docs/spec/
+docs/spec/v1/
 
 # Terraform/OpenTofu
 **/.terraform/
