@@ -1,0 +1,392 @@
+name: Tofu Plan Root
+
+# Plans one root with its layer's plan identity (08 sections 2 and 3). Callers
+# reference this file at @main, and the plan identities' federated credentials
+# trust only this file on refs/heads/main (ADR 0045). The caller passes the
+# root and key; the identity, state and passphrase come from the layer table
+# below, never from the caller.
+#
+# The caller's event decides what the plan is for:
+#   pull_request                  PR plan: checks, PR comment, saved plan artifact
+#   issue_comment                 /apply re-plan of a later layer: PR comment, saved plan artifact
+#   schedule, workflow_dispatch   drift: plan of main, drift Issue
+#
+# The caller grants the permissions: contents read, id-token write, and
+# pull-requests write (PR plans) or issues write (drift).
+
+on:
+  workflow_call:
+    inputs:
+      root:
+        type: string
+        required: true
+      key:
+        type: string
+        required: false
+        default: ""
+
+env:
+  CONFTEST_VERSION: 0.71.0
+  INFRACOST_VERSION: 0.10.46
+  STATE_ACCOUNT: ${{ vars.STATE_ACCOUNT }}
+
+jobs:
+  tofu:
+    name: tofu
+    runs-on: ubuntu-24.04
+    env:
+      ROOT: ${{ inputs.root }}
+      KEY: ${{ inputs.key }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Resolve the layer
+        id: layer
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_EVENT_NUMBER: ${{ github.event.pull_request.number }}
+          PR_EVENT_SHA: ${{ github.event.pull_request.head.sha }}
+          COMMENT_PR: ${{ github.event.issue.number }}
+        run: |
+          [[ "$ROOT" =~ ^[a-z0-9_-]+(/[a-z0-9_-]+)+$ && "$KEY" =~ ^[a-z0-9-]*$ ]] || { echo "::error::invalid root or key: $ROOT $KEY"; exit 1; }
+          # The layer table of 08 section 2.
+          case "$ROOT" in
+            global/*)         layer=global       container=tfstate-global   client_var=AZURE_CLIENT_ID_GLOBAL_PLAN       secret=TOFU_PASSPHRASE_GLOBAL       state_key="${ROOT#global/}.tfstate" ;;
+            platform/apps/*)  layer=platform     container=tfstate-platform client_var=AZURE_CLIENT_ID_PLATFORM_PLAN     secret=TOFU_PASSPHRASE_PLATFORM     state_key="apps-$(tr / - <<< "${ROOT#platform/apps/}").tfstate" ;;
+            platform/azure/*) layer=platform     container=tfstate-platform client_var=AZURE_CLIENT_ID_PLATFORM_PLAN     secret=TOFU_PASSPHRASE_PLATFORM     state_key="${ROOT#platform/azure/}.tfstate" ;;
+            landing-zones/_root) layer=landingzones container=tfstate-lz    client_var=AZURE_CLIENT_ID_LANDINGZONES_PLAN secret=TOFU_PASSPHRASE_LANDINGZONES state_key="$KEY.tfstate" ;;
+            stamps/*/*)       layer=stamps       container=tfstate-stamps   client_var=""                                secret=TOFU_PASSPHRASE_STAMPS       state_key="${ROOT#stamps/}.tfstate" ;;
+            platform/gcp/*)   echo "::error::GCP roots are built with the first GCP customer (ADR 0008)"; exit 1 ;;
+            *)                echo "::error::$ROOT is not a root (08 section 2)"; exit 1 ;;
+          esac
+          if [ "$ROOT" = landing-zones/_root ] && [ -z "$KEY" ]; then echo "::error::landing-zones/_root needs a key"; exit 1; fi
+          case "$EVENT" in
+            pull_request)                 mode=pr     pr=$PR_EVENT_NUMBER sha=$PR_EVENT_SHA ;;
+            issue_comment)                mode=replan pr=$COMMENT_PR      sha=$(gh api "repos/$GH_REPO/pulls/$COMMENT_PR" --jq .head.sha) ;;
+            schedule | workflow_dispatch) mode=drift  pr=""               sha=$(gh api "repos/$GH_REPO/commits/main" --jq .sha) ;;
+            *)                            echo "::error::unsupported event $EVENT"; exit 1 ;;
+          esac
+          slug=$(tr / - <<< "$ROOT")${KEY:+--$KEY}
+          {
+            echo "layer=$layer"; echo "container=$container"; echo "client_var=$client_var"; echo "secret=$secret"
+            echo "state_key=$state_key"; echo "lz=$(cut -d/ -f2 <<< "$ROOT")"
+            echo "mode=$mode"; echo "pr=$pr"; echo "sha=$sha"; echo "slug=$slug"; echo "name=${KEY:-$ROOT}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Refuse while the iTop gate is on
+        if: vars.ITOP_GATE == 'on' && steps.layer.outputs.mode != 'drift'
+        run: |
+          echo "::error::ITOP_GATE is on, but the Change Request steps are built with iTop (ADR 0029)"
+          exit 1
+
+      - name: Check out the code to plan
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.layer.outputs.sha }}
+          path: src
+          persist-credentials: false
+
+      - name: Check out main for the policy and the scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          path: main
+          persist-credentials: false
+
+      - name: Find the working directory
+        id: dir
+        run: |
+          # A root deleted by the PR is planned with -destroy from main's copy (08 section 4).
+          has_tf() { compgen -G "$1/$ROOT/*.tf" > /dev/null || compgen -G "$1/$ROOT/*.tofu" > /dev/null; }
+          if has_tf src && { [ -z "$KEY" ] || [ -f "src/landing-zones/$KEY.yaml" ]; }; then
+            base=src destroy=false
+          elif has_tf main && { [ -z "$KEY" ] || [ -f "main/landing-zones/$KEY.yaml" ]; }; then
+            base=main destroy=true
+          else
+            echo "::error::$ROOT ${KEY} exists neither on the branch nor on main"; exit 1
+          fi
+          { echo "base=$base"; echo "destroy=$destroy"; echo "path=$base/$ROOT"; } >> "$GITHUB_OUTPUT"
+
+      - name: Install conftest
+        run: bash main/.github/scripts/install-tool.sh conftest "$CONFTEST_VERSION"
+
+      - name: Check the code with policy/code.rego
+        working-directory: ${{ steps.dir.outputs.base }}
+        run: |
+          # Every .tf and .tofu file of the checkout, so local modules are checked too (ADR 0045).
+          json=$(find . -path ./.git -prune -o -path '*/.terraform' -prune -o \( -name '*.tf.json' -o -name '*.tofu.json' \) -print)
+          if [ -n "$json" ]; then echo "::error::JSON configuration files are not allowed: $json"; exit 1; fi
+          mapfile -t files < <(find . -path ./.git -prune -o -path '*/.terraform' -prune -o \( -name '*.tf' -o -name '*.tofu' \) -print)
+          conftest test --no-color --parser hcl2 --policy "$GITHUB_WORKSPACE/main/policy" --namespace code "${files[@]}"
+
+      - name: Sign in as tl-landingzones-plan
+        id: app
+        if: steps.layer.outputs.layer == 'stamps'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.LZ_PLAN_APP_ID }}
+          private-key: ${{ secrets.LZ_PLAN_APP_KEY }}
+          repositories: ${{ github.event.repository.name }}
+
+      - name: Read the landing zone's Environment
+        id: lz
+        if: steps.layer.outputs.layer == 'stamps'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          LZ: ${{ steps.layer.outputs.lz }}
+        run: |
+          # Plan jobs run in no Environment, so they read lz-<lz> through tl-landingzones-plan (ADR 0019).
+          read_var() { gh api "repos/$GH_REPO/environments/lz-$LZ/variables/$1" --jq .value 2>/dev/null; }
+          client_id=$(read_var AZURE_CLIENT_ID_PLAN) || true
+          if [ -z "$client_id" ]; then
+            echo "::error::landing zone \`$LZ\` has no Environment yet: apply its \`lz.yaml\` first"; exit 1
+          fi
+          echo "client_id=$client_id" >> "$GITHUB_OUTPUT"
+          echo "subscription_id=$(read_var AZURE_SUBSCRIPTION_ID)" >> "$GITHUB_OUTPUT"
+
+      - name: Find the plan identity
+        id: identity
+        env:
+          CLIENT_ID: ${{ steps.layer.outputs.layer == 'stamps' && steps.lz.outputs.client_id || vars[steps.layer.outputs.client_var] }}
+          SUBSCRIPTION_ID: ${{ steps.layer.outputs.layer == 'stamps' && steps.lz.outputs.subscription_id || vars.PLATFORM_SUBSCRIPTION_ID }}
+          MODE: ${{ steps.layer.outputs.mode }}
+        run: |
+          if [ -z "$CLIENT_ID" ]; then
+            if [ "$MODE" = drift ]; then
+              echo "::notice::$ROOT: the layer's plan identity doesn't exist yet, so drift skips it (08 section 8)"
+              echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            echo "::error::$ROOT: the layer's plan identity doesn't exist yet"; exit 1
+          fi
+          { echo "skip=false"; echo "client_id=$CLIENT_ID"; echo "subscription_id=$SUBSCRIPTION_ID"; } >> "$GITHUB_OUTPUT"
+          { echo "ARM_CLIENT_ID=$CLIENT_ID"; echo "ARM_SUBSCRIPTION_ID=$SUBSCRIPTION_ID"; } >> "$GITHUB_ENV"
+
+      - name: Azure sign-in
+        if: steps.identity.outputs.skip != 'true'
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ steps.identity.outputs.client_id }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ steps.identity.outputs.subscription_id }}
+
+      - name: Set up OpenTofu
+        if: steps.identity.outputs.skip != 'true'
+        uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version_file: ${{ steps.dir.outputs.base }}/.opentofu-version
+          tofu_wrapper: false
+
+      - name: Set the state and plan encryption
+        if: steps.identity.outputs.skip != 'true'
+        env:
+          PASSPHRASE: ${{ secrets[steps.layer.outputs.secret] }}
+        run: |
+          # ADR 0046: pbkdf2 key from the layer's passphrase, aes_gcm, enforced for state and plan.
+          if [ ${#PASSPHRASE} -lt 32 ] || [[ "$PASSPHRASE" == *$'\n'* ]]; then
+            echo "::error::${{ steps.layer.outputs.secret }} is missing, shorter than 32 characters or has a line break"; exit 1
+          fi
+          p=${PASSPHRASE//\\/\\\\}; p=${p//\"/\\\"}; p=${p//\$\{/\$\$\{}; p=${p//%\{/%%\{}
+          {
+            echo 'TF_ENCRYPTION<<TF_ENCRYPTION_END'
+            cat <<EOF
+          key_provider "pbkdf2" "layer" {
+            passphrase = "$p"
+          }
+          method "aes_gcm" "layer" {
+            keys = key_provider.pbkdf2.layer
+          }
+          state {
+            method   = method.aes_gcm.layer
+            enforced = true
+          }
+          plan {
+            method   = method.aes_gcm.layer
+            enforced = true
+          }
+          EOF
+            echo TF_ENCRYPTION_END
+          } >> "$GITHUB_ENV"
+
+      - name: tofu init
+        if: steps.identity.outputs.skip != 'true'
+        env:
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          ARM_USE_OIDC: "true"
+          ARM_STORAGE_USE_AZUREAD: "true"
+        run: >-
+          tofu -chdir="${{ steps.dir.outputs.path }}" init -input=false -no-color -lockfile=readonly
+          -backend-config="storage_account_name=$STATE_ACCOUNT"
+          -backend-config="container_name=${{ steps.layer.outputs.container }}"
+          -backend-config="key=${{ steps.layer.outputs.state_key }}"
+          -backend-config="use_azuread_auth=true"
+
+      - name: tofu fmt
+        if: steps.identity.outputs.skip != 'true' && steps.layer.outputs.mode == 'pr' && steps.dir.outputs.destroy != 'true'
+        run: tofu -chdir="${{ steps.dir.outputs.path }}" fmt -check -diff -no-color
+
+      - name: tofu validate
+        if: steps.identity.outputs.skip != 'true'
+        run: tofu -chdir="${{ steps.dir.outputs.path }}" validate -no-color
+
+      - name: tofu plan
+        id: plan
+        if: steps.identity.outputs.skip != 'true'
+        env:
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          ARM_USE_OIDC: "true"
+          ARM_STORAGE_USE_AZUREAD: "true"
+          TF_VAR_landing_zone: ${{ inputs.key }}
+          DESTROY: ${{ steps.dir.outputs.destroy }}
+        run: |
+          # Plans take no state lock: a plan identity can't write the lock blob (08 section 7).
+          args=(-input=false -no-color -lock=false -detailed-exitcode -out=tfplan)
+          if [ "$DESTROY" = true ]; then args+=(-destroy); fi
+          set +e
+          tofu -chdir="${{ steps.dir.outputs.path }}" plan "${args[@]}" > "$RUNNER_TEMP/plan.log" 2>&1
+          code=$?
+          set -e
+          cat "$RUNNER_TEMP/plan.log"
+          echo "exitcode=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" -eq 1 ]; then exit 1; fi
+          tofu -chdir="${{ steps.dir.outputs.path }}" show -no-color tfplan > "$RUNNER_TEMP/plan.txt"
+
+      - name: Run the conftest checks
+        id: conftest
+        if: steps.layer.outputs.mode == 'pr' && steps.plan.outcome == 'success'
+        working-directory: ${{ steps.dir.outputs.path }}
+        run: |
+          # main's rules, the PR's catalog/ (08 section 3, Checks on every plan).
+          tofu show -json tfplan > "$RUNNER_TEMP/plan.json"
+          data=()
+          if [ -d "$GITHUB_WORKSPACE/src/catalog" ]; then data=(--data "$GITHUB_WORKSPACE/src/catalog"); fi
+          set +e
+          conftest test --no-color "$RUNNER_TEMP/plan.json" --policy "$GITHUB_WORKSPACE/main/policy" "${data[@]}" \
+            --namespace naming --namespace tags --namespace regions --namespace catalog > "$RUNNER_TEMP/conftest.txt" 2>&1
+          code=$?
+          set -e
+          cat "$RUNNER_TEMP/conftest.txt"
+          exit $code
+
+      - name: Set up Infracost
+        if: steps.layer.outputs.mode == 'pr' && steps.plan.outcome == 'success'
+        uses: infracost/actions/setup@fb736a8f219195d6efdca58682069b16fe1bc280 # v4.2.0
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+          version: ${{ env.INFRACOST_VERSION }}
+
+      - name: Infracost
+        if: steps.layer.outputs.mode == 'pr' && steps.plan.outcome == 'success'
+        continue-on-error: true
+        run: |
+          # Never fails the PR: posts the monthly cost change (08 section 3).
+          infracost diff --path "$RUNNER_TEMP/plan.json" --no-color > "$RUNNER_TEMP/cost.txt" 2>&1 \
+            || echo "Infracost could not price this plan." >> "$RUNNER_TEMP/cost.txt"
+          cat "$RUNNER_TEMP/cost.txt"
+
+      - name: Upload the saved plan
+        if: steps.layer.outputs.mode != 'drift' && steps.plan.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          # Encrypted with the layer's passphrase (ADR 0046). Named after the commit, so
+          # only a plan of the PR's head commit is ever applied (08 section 4).
+          name: plan-${{ steps.layer.outputs.slug }}-${{ steps.layer.outputs.sha }}
+          path: ${{ steps.dir.outputs.path }}/tfplan
+          retention-days: 7
+          if-no-files-found: error
+          # The second stamps pass plans a stamp again in the same /apply run (08 section 6).
+          overwrite: true
+
+      - name: Comment on the PR
+        if: always() && steps.layer.outputs.mode != 'drift' && steps.identity.outputs.skip == 'false'
+        env:
+          MODE: ${{ steps.layer.outputs.mode }}
+          PR: ${{ steps.layer.outputs.pr }}
+          SHA: ${{ steps.layer.outputs.sha }}
+          DESTROY: ${{ steps.dir.outputs.destroy }}
+          PLAN_OUTCOME: ${{ steps.plan.outcome }}
+          CONFTEST_OUTCOME: ${{ steps.conftest.outcome }}
+          PASSPHRASE: ${{ secrets[steps.layer.outputs.secret] }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          marker="<!-- tofu-plan ${ROOT} ${KEY} -->"
+          log=$RUNNER_TEMP/plan.txt; [ -f "$log" ] || log=$RUNNER_TEMP/plan.log
+          summary=$(grep -E '^(Plan: |No changes\.|Error: )' "$log" | head -1 || true)
+          title="Plan: \`$ROOT\`${KEY:+ \`$KEY\`}"
+          [ "$MODE" = replan ] && title="Plan before apply: \`$ROOT\`${KEY:+ \`$KEY\`}"
+          {
+            echo "$marker"
+            echo "### $title"
+            echo
+            echo "**${summary:-The plan failed.}** Commit ${SHA:0:7}, [run]($RUN_URL)."
+            [ "$DESTROY" = true ] && echo && echo "The root is deleted by this PR, so this is a destroy plan from \`main\`'s copy."
+            echo
+            echo "<details><summary>Full plan</summary>"
+            echo
+            echo '```text'
+            head -c 50000 "$log"
+            echo '```'
+            echo "</details>"
+            echo
+            if [ "$MODE" = pr ]; then
+              echo "**Checks:** policy/code.rego passed, plan ${PLAN_OUTCOME:-skipped}, conftest ${CONFTEST_OUTCOME:-skipped}."
+              if [ -s "$RUNNER_TEMP/conftest.txt" ] && [ "$CONFTEST_OUTCOME" = failure ]; then
+                echo; echo '```text'; head -c 5000 "$RUNNER_TEMP/conftest.txt"; echo '```'
+              fi
+              echo
+              echo "**Infracost** (monthly cost change)"
+              echo
+              echo '```text'
+              if [ -f "$RUNNER_TEMP/cost.txt" ]; then head -c 8000 "$RUNNER_TEMP/cost.txt"; else echo "Not run: the plan failed."; fi
+              echo '```'
+            fi
+          } > "$RUNNER_TEMP/comment.md"
+          # The comment is public: make sure the passphrase never reaches it.
+          body=$(cat "$RUNNER_TEMP/comment.md")
+          printf '%s\n' "${body//"$PASSPHRASE"/***}" > "$RUNNER_TEMP/comment.md"
+          if [ "$MODE" = pr ]; then
+            id=$(gh api "repos/$GH_REPO/issues/$PR/comments" --paginate \
+              --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | tail -1)
+          fi
+          if [ -n "${id:-}" ]; then
+            gh api -X PATCH "repos/$GH_REPO/issues/comments/$id" -F body=@"$RUNNER_TEMP/comment.md" --silent
+          else
+            gh api "repos/$GH_REPO/issues/$PR/comments" -F body=@"$RUNNER_TEMP/comment.md" --silent
+          fi
+
+      - name: Open, update or close the drift Issue
+        if: always() && steps.layer.outputs.mode == 'drift' && steps.identity.outputs.skip == 'false'
+        env:
+          CODE: ${{ steps.plan.outputs.exitcode }}
+          NAME: ${{ steps.layer.outputs.name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # 08 section 8: one Issue per root, labelled drift, titled "Drift: <root or key>".
+          title="Drift: $NAME"
+          gh label create drift --color D93F0B --description "Live state differs from main (tofu-drift.yml)" 2>/dev/null || true
+          number=$(gh issue list --label drift --state open --limit 200 --json number,title \
+            --jq ".[] | select(.title == \"$title\") | .number" | head -1)
+          log=$RUNNER_TEMP/plan.txt; [ -f "$log" ] || log=$RUNNER_TEMP/plan.log
+          if [ "$CODE" = 0 ]; then
+            if [ -n "$number" ]; then gh issue close "$number" --comment "No drift in the [nightly run]($RUN_URL)."; fi
+            exit 0
+          fi
+          summary=$(grep -E '^(Plan: |Error: )' "$log" 2>/dev/null | head -1 || true)
+          {
+            echo "\`$ROOT\`${KEY:+ \`$KEY\`} on \`main\` differs from the live state, or its plan failed, in the [nightly run]($RUN_URL)."
+            echo
+            echo "**${summary:-The plan failed before it ran.}**"
+            echo
+            echo "<details><summary>Plan</summary>"
+            echo
+            echo '```text'
+            if [ -f "$log" ]; then head -c 50000 "$log"; fi
+            echo '```'
+            echo "</details>"
+            echo
+            echo "Fix drift with a PR, never with an apply from the drift job (08 section 8)."
+          } > "$RUNNER_TEMP/issue.md"
+          if [ -n "$number" ]; then
+            gh issue edit "$number" --body-file "$RUNNER_TEMP/issue.md"
+          else
+            gh issue create --title "$title" --label drift --body-file "$RUNNER_TEMP/issue.md"
+          fi

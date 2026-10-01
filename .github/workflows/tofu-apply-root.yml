@@ -1,0 +1,280 @@
+name: Tofu Apply Root
+
+# Applies one root's saved plan for the PR's head commit, in the root's
+# Environment (08 sections 4 and 5). Called only by tofu-apply.yml, at @main,
+# and the apply identities' federated credentials trust only this file on
+# refs/heads/main (ADR 0045). The caller passes the root and key; the
+# Environment, identity, state and passphrase come from the layer table below.
+#
+# The caller grants: contents read, id-token write, pull-requests write, actions read.
+
+on:
+  workflow_call:
+    inputs:
+      root:
+        type: string
+        required: true
+      key:
+        type: string
+        required: false
+        default: ""
+
+env:
+  CONFTEST_VERSION: 0.71.0
+  STATE_ACCOUNT: ${{ vars.STATE_ACCOUNT }}
+
+jobs:
+  resolve:
+    name: resolve
+    runs-on: ubuntu-24.04
+    outputs:
+      environment: ${{ steps.layer.outputs.environment }}
+      container: ${{ steps.layer.outputs.container }}
+      client_var: ${{ steps.layer.outputs.client_var }}
+      secret: ${{ steps.layer.outputs.secret }}
+      state_key: ${{ steps.layer.outputs.state_key }}
+      slug: ${{ steps.layer.outputs.slug }}
+    steps:
+      - name: Resolve the layer
+        id: layer
+        env:
+          ROOT: ${{ inputs.root }}
+          KEY: ${{ inputs.key }}
+        run: |
+          [[ "$ROOT" =~ ^[a-z0-9_-]+(/[a-z0-9_-]+)+$ && "$KEY" =~ ^[a-z0-9-]*$ ]] || { echo "::error::invalid root or key: $ROOT $KEY"; exit 1; }
+          # The layer table of 08 section 2.
+          case "$ROOT" in
+            global/*)            environment=global       container=tfstate-global   client_var=AZURE_CLIENT_ID_GLOBAL_APPLY       secret=TOFU_PASSPHRASE_GLOBAL       state_key="${ROOT#global/}.tfstate" ;;
+            platform/apps/*)     environment=platform     container=tfstate-platform client_var=AZURE_CLIENT_ID_PLATFORM_APPLY     secret=TOFU_PASSPHRASE_PLATFORM     state_key="apps-$(tr / - <<< "${ROOT#platform/apps/}").tfstate" ;;
+            platform/azure/*)    environment=platform     container=tfstate-platform client_var=AZURE_CLIENT_ID_PLATFORM_APPLY     secret=TOFU_PASSPHRASE_PLATFORM     state_key="${ROOT#platform/azure/}.tfstate" ;;
+            landing-zones/_root) environment=landingzones container=tfstate-lz       client_var=AZURE_CLIENT_ID_LANDINGZONES_APPLY secret=TOFU_PASSPHRASE_LANDINGZONES state_key="$KEY.tfstate" ;;
+            stamps/*/*)          environment="lz-$(cut -d/ -f2 <<< "$ROOT")" container=tfstate-stamps client_var=AZURE_CLIENT_ID_DEPLOY secret=TOFU_PASSPHRASE_STAMPS state_key="${ROOT#stamps/}.tfstate" ;;
+            platform/gcp/*)      echo "::error::GCP roots are built with the first GCP customer (ADR 0008)"; exit 1 ;;
+            *)                   echo "::error::$ROOT is not a root (08 section 2)"; exit 1 ;;
+          esac
+          if [ "$ROOT" = landing-zones/_root ] && [ -z "$KEY" ]; then echo "::error::landing-zones/_root needs a key"; exit 1; fi
+          {
+            echo "environment=$environment"; echo "container=$container"; echo "client_var=$client_var"
+            echo "secret=$secret"; echo "state_key=$state_key"; echo "slug=$(tr / - <<< "$ROOT")${KEY:+--$KEY}"
+          } >> "$GITHUB_OUTPUT"
+
+  apply:
+    name: apply
+    needs: resolve
+    runs-on: ubuntu-24.04
+    environment: ${{ needs.resolve.outputs.environment }}
+    # One apply per state key; OpenTofu's state lock is the second guard (08 section 4).
+    concurrency:
+      group: ${{ needs.resolve.outputs.container }}-${{ needs.resolve.outputs.state_key }}
+      cancel-in-progress: false
+    env:
+      ROOT: ${{ inputs.root }}
+      KEY: ${{ inputs.key }}
+      ENVIRONMENT: ${{ needs.resolve.outputs.environment }}
+      SLUG: ${{ needs.resolve.outputs.slug }}
+      PR: ${{ github.event.issue.number }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Refuse while the iTop gate is on
+        if: vars.ITOP_GATE == 'on'
+        run: |
+          echo "::error::ITOP_GATE is on, but the Change Request steps are built with iTop (ADR 0029)"
+          exit 1
+
+      - name: Read the PR
+        id: pr
+        run: |
+          [ -n "$PR" ] || { echo "::error::tofu-apply-root.yml runs only from a /apply comment"; exit 1; }
+          gh api "repos/$GH_REPO/pulls/$PR" > "$RUNNER_TEMP/pr.json"
+          echo "sha=$(jq -r .head.sha "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
+
+      - name: Check the approver
+        run: |
+          # Nobody approves their own change: not the PR author, and not whoever ran
+          # the onboarding form, which onboard.yml records as "Form run by: @<login>" (08 section 5).
+          author=$(jq -r .user.login "$RUNNER_TEMP/pr.json")
+          form_runner=$(jq -r '.body // ""' "$RUNNER_TEMP/pr.json" | sed -n 's/^Form run by: @\([A-Za-z0-9-]*\).*/\1/p' | head -1)
+          approvers=$(gh api "repos/$GH_REPO/actions/runs/$GITHUB_RUN_ID/approvals" \
+            --jq "[.[] | select(.state == \"approved\" and any(.environments[]; .name == \"$ENVIRONMENT\")) | .user.login] | unique | .[]")
+          if [ -z "$approvers" ]; then echo "::error::no approval in $ENVIRONMENT found for this run"; exit 1; fi
+          for a in $approvers; do
+            if [ "$a" = "$author" ]; then echo "::error::$a approved their own PR in $ENVIRONMENT"; exit 1; fi
+            if [ -n "$form_runner" ] && [ "$a" = "$form_runner" ]; then echo "::error::$a ran the onboarding form and approved its apply"; exit 1; fi
+          done
+          echo "Approved in $ENVIRONMENT by: $approvers"
+
+      - name: Check out the code to apply
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.pr.outputs.sha }}
+          path: src
+          persist-credentials: false
+
+      - name: Check out main for the policy and the scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          path: main
+          persist-credentials: false
+
+      - name: Find the working directory
+        id: dir
+        run: |
+          # A root deleted by the PR is destroyed from main's copy (08 section 4).
+          has_tf() { compgen -G "$1/$ROOT/*.tf" > /dev/null || compgen -G "$1/$ROOT/*.tofu" > /dev/null; }
+          if has_tf src && { [ -z "$KEY" ] || [ -f "src/landing-zones/$KEY.yaml" ]; }; then
+            base=src destroy=false
+          elif has_tf main && { [ -z "$KEY" ] || [ -f "main/landing-zones/$KEY.yaml" ]; }; then
+            base=main destroy=true
+          else
+            echo "::error::$ROOT ${KEY} exists neither on the branch nor on main"; exit 1
+          fi
+          { echo "base=$base"; echo "destroy=$destroy"; echo "path=$base/$ROOT"; } >> "$GITHUB_OUTPUT"
+
+      - name: Install conftest
+        run: bash main/.github/scripts/install-tool.sh conftest "$CONFTEST_VERSION"
+
+      - name: Check the code with policy/code.rego
+        working-directory: ${{ steps.dir.outputs.base }}
+        run: |
+          json=$(find . -path ./.git -prune -o -path '*/.terraform' -prune -o \( -name '*.tf.json' -o -name '*.tofu.json' \) -print)
+          if [ -n "$json" ]; then echo "::error::JSON configuration files are not allowed: $json"; exit 1; fi
+          mapfile -t files < <(find . -path ./.git -prune -o -path '*/.terraform' -prune -o \( -name '*.tf' -o -name '*.tofu' \) -print)
+          conftest test --no-color --parser hcl2 --policy "$GITHUB_WORKSPACE/main/policy" --namespace code "${files[@]}"
+
+      - name: Download the saved plan of this run
+        id: this_run
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          # Planned again after an earlier layer, or after an earlier /apply (08 section 4).
+          name: plan-${{ needs.resolve.outputs.slug }}-${{ steps.pr.outputs.sha }}
+          path: ${{ runner.temp }}/plan
+
+      - name: Find the PR's saved plan
+        id: pr_plan
+        if: steps.this_run.outcome != 'success'
+        env:
+          SHA: ${{ steps.pr.outputs.sha }}
+        run: |
+          run_id=$(gh api "repos/$GH_REPO/actions/workflows/tofu-plan.yml/runs?head_sha=$SHA&event=pull_request&status=success&per_page=1" \
+            --jq '.workflow_runs[0].id // empty')
+          if [ -z "$run_id" ]; then echo "::error::no successful plan for the head commit ${SHA:0:7}: push or re-run the plan"; exit 1; fi
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Download the PR's saved plan
+        if: steps.this_run.outcome != 'success'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: plan-${{ needs.resolve.outputs.slug }}-${{ steps.pr.outputs.sha }}
+          path: ${{ runner.temp }}/plan
+          run-id: ${{ steps.pr_plan.outputs.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Azure sign-in
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars[needs.resolve.outputs.client_var] }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ startsWith(needs.resolve.outputs.environment, 'lz-') && vars.AZURE_SUBSCRIPTION_ID || vars.PLATFORM_SUBSCRIPTION_ID }}
+
+      - name: Set up OpenTofu
+        uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version_file: ${{ steps.dir.outputs.base }}/.opentofu-version
+          tofu_wrapper: false
+
+      - name: Set the state and plan encryption
+        env:
+          PASSPHRASE: ${{ secrets[needs.resolve.outputs.secret] }}
+        run: |
+          # ADR 0046: pbkdf2 key from the layer's passphrase, aes_gcm, enforced for state and plan.
+          if [ ${#PASSPHRASE} -lt 32 ] || [[ "$PASSPHRASE" == *$'\n'* ]]; then
+            echo "::error::${{ needs.resolve.outputs.secret }} is missing, shorter than 32 characters or has a line break"; exit 1
+          fi
+          p=${PASSPHRASE//\\/\\\\}; p=${p//\"/\\\"}; p=${p//\$\{/\$\$\{}; p=${p//%\{/%%\{}
+          {
+            echo 'TF_ENCRYPTION<<TF_ENCRYPTION_END'
+            cat <<EOF
+          key_provider "pbkdf2" "layer" {
+            passphrase = "$p"
+          }
+          method "aes_gcm" "layer" {
+            keys = key_provider.pbkdf2.layer
+          }
+          state {
+            method   = method.aes_gcm.layer
+            enforced = true
+          }
+          plan {
+            method   = method.aes_gcm.layer
+            enforced = true
+          }
+          EOF
+            echo TF_ENCRYPTION_END
+          } >> "$GITHUB_ENV"
+
+      - name: Set the Azure environment
+        env:
+          CLIENT_ID: ${{ vars[needs.resolve.outputs.client_var] }}
+          SUBSCRIPTION_ID: ${{ startsWith(needs.resolve.outputs.environment, 'lz-') && vars.AZURE_SUBSCRIPTION_ID || vars.PLATFORM_SUBSCRIPTION_ID }}
+          TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+        run: |
+          {
+            echo "ARM_CLIENT_ID=$CLIENT_ID"; echo "ARM_SUBSCRIPTION_ID=$SUBSCRIPTION_ID"; echo "ARM_TENANT_ID=$TENANT_ID"
+            echo "ARM_USE_OIDC=true"; echo "ARM_STORAGE_USE_AZUREAD=true"; echo "TF_VAR_landing_zone=$KEY"
+          } >> "$GITHUB_ENV"
+
+      - name: tofu init
+        run: >-
+          tofu -chdir="${{ steps.dir.outputs.path }}" init -input=false -no-color -lockfile=readonly
+          -backend-config="storage_account_name=$STATE_ACCOUNT"
+          -backend-config="container_name=${{ needs.resolve.outputs.container }}"
+          -backend-config="key=${{ needs.resolve.outputs.state_key }}"
+          -backend-config="use_azuread_auth=true"
+
+      - name: tofu apply
+        run: |
+          set +e
+          tofu -chdir="${{ steps.dir.outputs.path }}" apply -input=false -no-color "$RUNNER_TEMP/plan/tfplan" 2>&1 | tee "$RUNNER_TEMP/apply.log"
+          code=${PIPESTATUS[0]}
+          set -e
+          if [ "$code" -ne 0 ]; then
+            if grep -q -i 'saved plan is stale' "$RUNNER_TEMP/apply.log"; then
+              echo "::error::plan is stale: re-run the plan"
+            fi
+            exit "$code"
+          fi
+
+      - name: Check that nothing is left to apply
+        env:
+          DESTROY: ${{ steps.dir.outputs.destroy }}
+        run: |
+          # `applied` is green only when a final plan of each root shows no changes (08 section 4).
+          args=(-input=false -no-color -detailed-exitcode)
+          if [ "$DESTROY" = true ]; then args+=(-destroy); fi
+          set +e
+          tofu -chdir="${{ steps.dir.outputs.path }}" plan "${args[@]}" > "$RUNNER_TEMP/final.log" 2>&1
+          code=$?
+          set -e
+          cat "$RUNNER_TEMP/final.log"
+          case "$code" in
+            0) ;;
+            2) echo "::error::$ROOT ${KEY}: the final plan still shows changes"; exit 1 ;;
+            *) exit "$code" ;;
+          esac
+
+      - name: Comment on the PR
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+          SHA: ${{ steps.pr.outputs.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          result=$(grep -E '^(Apply complete!|Destroy complete!|Error: )' "$RUNNER_TEMP/apply.log" 2>/dev/null | head -1 || true)
+          gh api "repos/$GH_REPO/issues/$PR/comments" --silent -F body=@- <<EOF
+          ### Apply: \`$ROOT\`${KEY:+ \`$KEY\`} in \`$ENVIRONMENT\`: $JOB_STATUS
+
+          **${result:-The apply did not run.}** Commit ${SHA:0:7}, [run]($RUN_URL).
+          EOF
