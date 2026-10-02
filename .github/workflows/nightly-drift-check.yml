@@ -1,6 +1,6 @@
 name: Nightly Drift Check
 
-# Every night, plans every root on main with its plan identity and opens,
+# Every night at 02:00 UTC, plans every root on main with its plan identity and opens,
 # updates or closes one `drift` Issue per root (08 section 8). A layer whose
 # plan identity doesn't exist yet is skipped. Also runs the deployment audit.
 # The caps and stray-subscription checks need a plan identity's token, which
