@@ -1,0 +1,51 @@
+name: Pull Request Replan Dependents
+
+# After a successful Pull Request Apply, re-runs the plan of every open PR whose
+# description says "Depends on #<n>" for the applied PR, once every PR it lists
+# is applied, and comments on it. Applies nothing (ADR 0036).
+
+on:
+  workflow_run:
+    workflows: [Pull Request Apply]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  replan:
+    name: replan
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: write
+      statuses: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TITLE: ${{ github.event.workflow_run.display_title }}
+    steps:
+      - name: Re-plan the dependent PRs
+        run: |
+          # Pull Request Apply runs are named "Pull Request Apply #<n>".
+          applied_pr=$(sed -n 's/^Pull Request Apply #\([0-9][0-9]*\)$/\1/p' <<< "$TITLE")
+          [ -n "$applied_pr" ] || { echo "No PR number in \"$TITLE\""; exit 0; }
+          is_applied() {
+            read -r state sha < <(gh pr view "$1" --json state,headRefOid --jq '[.state, .headRefOid] | @tsv')
+            [ "$state" = MERGED ] && return 0
+            [ "$(gh api "repos/$GH_REPO/commits/$sha/statuses" --jq '[.[] | select(.context == "applied")][0].state // ""')" = success ]
+          }
+          is_applied "$applied_pr" || { echo "#$applied_pr is not fully applied"; exit 0; }
+          gh pr list --state open --limit 200 --json number,body,headRefOid --jq '.[] | [.number, .headRefOid, (.body // "" | @base64)] | @tsv' |
+          while read -r number sha body; do
+            deps=$(base64 -d <<< "$body" | grep -oiE 'depends on #[0-9]+' | grep -oE '[0-9]+' | sort -u)
+            grep -qx "$applied_pr" <<< "$deps" || continue
+            waiting=""
+            for d in $deps; do is_applied "$d" || waiting+=" #$d"; done
+            if [ -n "$waiting" ]; then echo "#$number still waits for$waiting"; continue; fi
+            run_id=$(gh api "repos/$GH_REPO/actions/workflows/pull-request-plan.yml/runs?head_sha=$sha&event=pull_request&per_page=1" --jq '.workflow_runs[0].id // empty')
+            if [ -z "$run_id" ]; then echo "#$number has no plan run to re-run"; continue; fi
+            gh run rerun "$run_id"
+            gh pr comment "$number" --body "Re-planned: every PR this one depends on is applied (#$applied_pr was the last)."
+          done

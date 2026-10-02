@@ -1,0 +1,125 @@
+name: Pull Request Plan
+
+# Plans every root a PR touches, each with its layer's plan identity, and runs
+# the checks (08 sections 2 to 4). The summary jobs `plan` and `conftest` are
+# required checks on main; they pass when there is nothing to check.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions: {}
+
+concurrency:
+  group: pull-request-plan-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  CONFTEST_VERSION: 0.71.0
+  ACTIONLINT_VERSION: 1.7.12
+
+jobs:
+  detect:
+    name: detect
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      roots: ${{ steps.detect.outputs.roots }}
+      policy: ${{ steps.detect.outputs.policy }}
+      workflows: ${{ steps.detect.outputs.workflows }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Detect the roots
+        id: detect
+        env:
+          BASE: origin/${{ github.event.pull_request.base.ref }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          roots=$(bash .github/scripts/find-changed-files.sh "$BASE" "$HEAD")
+          echo "Roots: $roots"
+          changed=$(git diff --name-only --no-renames "$(git merge-base "$BASE" "$HEAD")" "$HEAD")
+          {
+            echo "roots=$roots"
+            echo "policy=$(grep -q '^policy/' <<< "$changed" && echo true || echo false)"
+            echo "workflows=$(grep -qE '^(\.github/|renovate\.json$)' <<< "$changed" && echo true || echo false)"
+          } >> "$GITHUB_OUTPUT"
+
+  roots:
+    name: plan (${{ matrix.root }}${{ matrix.key && format(' {0}', matrix.key) || '' }})
+    needs: detect
+    if: needs.detect.outputs.roots != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.detect.outputs.roots) }}
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-plan.yml@main
+    with:
+      root: ${{ matrix.root }}
+      key: ${{ matrix.key || '' }}
+    secrets: inherit
+
+  policy-tests:
+    name: policy tests
+    needs: detect
+    if: needs.detect.outputs.policy == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - run: bash .github/scripts/install-tool.sh conftest "$CONFTEST_VERSION"
+      # The PR's own rules are tested here; they take effect once merged (08 section 2).
+      - run: conftest verify --no-color --policy policy
+
+  lint:
+    name: lint workflows
+    needs: detect
+    if: needs.detect.outputs.workflows == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - run: bash .github/scripts/install-tool.sh actionlint "$ACTIONLINT_VERSION"
+      - run: actionlint -no-color
+
+  plan:
+    name: plan
+    needs: [detect, roots, lint]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "detect, roots, lint: $RESULTS"
+          if grep -qE 'failure|cancelled' <<< "$RESULTS"; then exit 1; fi
+
+  conftest:
+    name: conftest
+    needs: [detect, roots, policy-tests]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          # conftest runs inside each root's plan job, so a failed plan fails this check too.
+          echo "detect, roots, policy tests: $RESULTS"
+          if grep -qE 'failure|cancelled' <<< "$RESULTS"; then exit 1; fi

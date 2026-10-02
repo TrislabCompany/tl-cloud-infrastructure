@@ -1,0 +1,151 @@
+name: Pull Request Security Scan
+
+# Prowler IaC scan of the roots a PR changes (08 section 3, Checks on every
+# plan). Fails on a `high` or `critical` finding that the root's
+# .prowler-exceptions.yaml doesn't list:
+#
+#   exceptions:
+#     - check: AVD-AZU-0012          # the check ID in the finding
+#       resource: storage.tf         # the file, or a resource address such as azurerm_storage_account.state
+#       reason: Why the finding is accepted
+#       expires: 2027-06-30          # at most 12 months away; an expired exception counts as missing
+#
+# The job `prowler` is a required check on main; it passes when no root changed.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions: {}
+
+concurrency:
+  group: prowler-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  PROWLER_VERSION: 5.44.0
+  TRIVY_VERSION: 0.74.0
+
+jobs:
+  prowler:
+    name: prowler
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Detect the roots
+        id: detect
+        env:
+          BASE: origin/${{ github.event.pull_request.base.ref }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          roots=$(bash .github/scripts/find-changed-files.sh "$BASE" "$HEAD")
+          # Scan each changed folder once, and only if it is still on the branch.
+          dirs=$(jq -r '.[].root' <<< "$roots" | sort -u | while read -r d; do [ -d "$d" ] && echo "$d"; done | paste -sd ' ' -)
+          echo "Folders to scan: ${dirs:-none}"
+          echo "dirs=$dirs" >> "$GITHUB_OUTPUT"
+
+      - name: Install Prowler and Trivy
+        if: steps.detect.outputs.dirs != ''
+        run: |
+          bash .github/scripts/install-tool.sh trivy "$TRIVY_VERSION"
+          pipx install "prowler==$PROWLER_VERSION"
+          python3 -c 'import yaml' 2> /dev/null || python3 -m pip install --quiet --user --break-system-packages pyyaml
+
+      - name: Scan
+        if: steps.detect.outputs.dirs != ''
+        env:
+          DIRS: ${{ steps.detect.outputs.dirs }}
+        run: |
+          for d in $DIRS; do
+            out="$RUNNER_TEMP/prowler/$(tr / - <<< "$d")"
+            # Prowler exits non-zero when it has findings; the next step decides.
+            prowler iac --scan-path "$d" --output-formats json-ocsf --output-directory "$out" --output-filename prowler --no-banner || true
+            ls "$out"/prowler.ocsf.json > /dev/null
+          done
+
+      - name: Check the findings against the exceptions
+        if: steps.detect.outputs.dirs != ''
+        env:
+          DIRS: ${{ steps.detect.outputs.dirs }}
+        run: |
+          python3 - <<'PY'
+          import datetime, json, os, sys
+          import yaml
+
+          today = datetime.date.today()
+          limit = today + datetime.timedelta(days=366)
+          blocking, accepted, errors = [], [], []
+
+          def strings(value):
+              if isinstance(value, str):
+                  yield value
+              elif isinstance(value, dict):
+                  for v in value.values():
+                      yield from strings(v)
+              elif isinstance(value, list):
+                  for v in value:
+                      yield from strings(v)
+
+          for root in os.environ["DIRS"].split():
+              exceptions = []
+              path = os.path.join(root, ".prowler-exceptions.yaml")
+              if os.path.exists(path):
+                  for e in (yaml.safe_load(open(path)) or {}).get("exceptions") or []:
+                      missing = [k for k in ("check", "resource", "reason", "expires") if not e.get(k)]
+                      if missing:
+                          errors.append(f"{path}: an exception is missing {', '.join(missing)}")
+                          continue
+                      expires = e["expires"] if isinstance(e["expires"], datetime.date) else datetime.date.fromisoformat(str(e["expires"]))
+                      if expires > limit:
+                          errors.append(f"{path}: the exception for {e['check']} expires more than 12 months from now")
+                      elif expires >= today:
+                          exceptions.append(e)
+              out = os.path.join(os.environ["RUNNER_TEMP"], "prowler", root.replace("/", "-"), "prowler.ocsf.json")
+              for f in json.load(open(out)):
+                  if f.get("status_code") != "FAIL" or str(f.get("severity", "")).lower() not in ("high", "critical"):
+                      continue
+                  check = f.get("metadata", {}).get("event_code", "")
+                  values = set(strings(f.get("resources", [])))
+                  values |= {os.path.basename(v) for v in values}
+                  row = (root, check, str(f.get("severity")), ", ".join(r.get("name", "") for r in f.get("resources", [])), f.get("finding_info", {}).get("title", ""))
+                  match = next((e for e in exceptions if e["check"] == check and str(e["resource"]) in values), None)
+                  (accepted if match else blocking).append(row)
+
+          lines = ["<!-- prowler-iac-scan -->", "### Prowler IaC scan", ""]
+          if not blocking and not accepted and not errors:
+              lines.append("No `high` or `critical` findings.")
+          for title, rows in (("Blocking findings", blocking), ("Findings listed in `.prowler-exceptions.yaml`", accepted)):
+              if rows:
+                  lines += [f"**{title}**", "", "| Root | Check | Severity | Resource | Title |", "|---|---|---|---|---|"]
+                  lines += [f"| `{r}` | `{c}` | {s} | `{res}` | {t} |" for r, c, s, res, t in rows]
+                  lines.append("")
+          if errors:
+              lines += ["**Invalid exceptions**", ""] + [f"- {e}" for e in errors]
+          open(os.path.join(os.environ["RUNNER_TEMP"], "prowler.md"), "w").write("\n".join(lines) + "\n")
+          print("\n".join(lines))
+          sys.exit(1 if blocking or errors else 0)
+          PY
+
+      - name: Comment on the PR
+        if: always() && steps.detect.outputs.dirs != ''
+        run: |
+          [ -f "$RUNNER_TEMP/prowler.md" ] || printf '<!-- prowler-iac-scan -->\n### Prowler IaC scan\n\nThe scan failed: see the run.\n' > "$RUNNER_TEMP/prowler.md"
+          id=$(gh api "repos/$GH_REPO/issues/$PR/comments" --paginate \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- prowler-iac-scan -->"))) | .id' | tail -1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GH_REPO/issues/comments/$id" -F body=@"$RUNNER_TEMP/prowler.md" --silent
+          else
+            gh api "repos/$GH_REPO/issues/$PR/comments" -F body=@"$RUNNER_TEMP/prowler.md" --silent
+          fi
