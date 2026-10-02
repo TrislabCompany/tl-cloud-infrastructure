@@ -5,6 +5,7 @@ run-name: "Pull Request Apply #${{ github.event.issue.number }}"
 # file from main, so a PR can't change the apply steps (ADR 0045). Applies the
 # roots layer by layer (08 section 6), each in its Environment through
 # shared-apply.yml@main, and sets the commit status `applied` (08 section 4).
+# When every root is applied, it merges the PR (ADR 0056).
 #
 # The first layer with roots applies the PR's saved plans. Each later layer is
 # planned again after the layer before it, and so is every layer when the head
@@ -300,9 +301,12 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       statuses: write
+      contents: write
+      pull-requests: write
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
+      PR: ${{ github.event.issue.number }}
       RESULTS: ${{ join(needs.*.result, ' ') }}
       SHA: ${{ needs.guard.outputs.sha }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -316,3 +320,16 @@ jobs:
             exit 1
           fi
           gh api "repos/$GH_REPO/statuses/$SHA" -f state=success -f context=applied -f description="Every root is applied" -f target_url="$RUN_URL" --silent
+
+      # Merge at once, so main matches what runs (ADR 0056). GITHUB_TOKEN can't
+      # write workflow files, so a .github/** PR is merged by its author.
+      - name: Merge the PR
+        run: |
+          if gh pr diff "$PR" --name-only | grep -q '^\.github/'; then
+            gh pr comment "$PR" --body "Applied. This PR changes \`.github/**\`, so the author merges it by hand."
+            exit 0
+          fi
+          gh pr merge "$PR" --squash --delete-branch --match-head-commit "$SHA" || {
+            gh pr comment "$PR" --body "Applied, but the merge failed: $RUN_URL. Fix the cause, for example a conflict with main, push, and comment /apply again: the new plan shows no changes and the PR merges."
+            exit 1
+          }
