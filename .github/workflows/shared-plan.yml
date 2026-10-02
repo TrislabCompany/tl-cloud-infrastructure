@@ -169,6 +169,23 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ steps.identity.outputs.subscription_id }}
 
+      - name: Check that the state exists
+        id: state
+        if: steps.identity.outputs.skip != 'true'
+        env:
+          CONTAINER: ${{ steps.layer.outputs.container }}
+          STATE_KEY: ${{ steps.layer.outputs.state_key }}
+          MODE: ${{ steps.layer.outputs.mode }}
+        run: |
+          # tofu init writes an empty state when there is none, which a plan identity
+          # can't do. The first /apply creates it, and the next /apply plans and
+          # applies the root (08 section 7).
+          exists=$(az storage blob exists --auth-mode login --account-name "$STATE_ACCOUNT" \
+            --container-name "$CONTAINER" --name "$STATE_KEY" --query exists -o tsv)
+          if [ "$exists" = true ] || [ "$MODE" = drift ]; then echo "new=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          echo "::notice::$ROOT ${KEY}: new root with no state yet; the first /apply creates it"
+          echo "new=true" >> "$GITHUB_OUTPUT"
+
       - name: Set up OpenTofu
         if: steps.identity.outputs.skip != 'true'
         uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
@@ -208,7 +225,7 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: tofu init
-        if: steps.identity.outputs.skip != 'true'
+        if: steps.identity.outputs.skip != 'true' && steps.state.outputs.new != 'true'
         env:
           ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
           ARM_USE_OIDC: "true"
@@ -221,16 +238,16 @@ jobs:
           -backend-config="use_azuread_auth=true"
 
       - name: tofu fmt
-        if: steps.identity.outputs.skip != 'true' && steps.layer.outputs.mode == 'pr' && steps.dir.outputs.destroy != 'true'
+        if: steps.identity.outputs.skip != 'true' && steps.state.outputs.new != 'true' && steps.layer.outputs.mode == 'pr' && steps.dir.outputs.destroy != 'true'
         run: tofu -chdir="${{ steps.dir.outputs.path }}" fmt -check -diff -no-color
 
       - name: tofu validate
-        if: steps.identity.outputs.skip != 'true'
+        if: steps.identity.outputs.skip != 'true' && steps.state.outputs.new != 'true'
         run: tofu -chdir="${{ steps.dir.outputs.path }}" validate -no-color
 
       - name: tofu plan
         id: plan
-        if: steps.identity.outputs.skip != 'true'
+        if: steps.identity.outputs.skip != 'true' && steps.state.outputs.new != 'true'
         env:
           ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
           ARM_USE_OIDC: "true"
@@ -252,7 +269,8 @@ jobs:
 
       - name: Run the conftest checks
         id: conftest
-        if: steps.layer.outputs.mode == 'pr' && steps.plan.outcome == 'success'
+        # Also before apply: a new root's first plan is the /apply re-plan.
+        if: steps.layer.outputs.mode != 'drift' && steps.plan.outcome == 'success'
         working-directory: ${{ steps.dir.outputs.path }}
         run: |
           # main's rules, with the PR's catalog/ as data.pr and main's as data.main,
@@ -309,6 +327,8 @@ jobs:
           PR: ${{ steps.layer.outputs.pr }}
           SHA: ${{ steps.layer.outputs.sha }}
           DESTROY: ${{ steps.dir.outputs.destroy }}
+          NEW: ${{ steps.state.outputs.new }}
+          ENVIRONMENT: ${{ steps.layer.outputs.layer == 'stamps' && format('lz-{0}', steps.layer.outputs.lz) || steps.layer.outputs.layer }}
           PLAN_OUTCOME: ${{ steps.plan.outcome }}
           CONFTEST_OUTCOME: ${{ steps.conftest.outcome }}
           PASSPHRASE: ${{ secrets[steps.layer.outputs.secret] }}
@@ -323,21 +343,27 @@ jobs:
             echo "$marker"
             echo "### $title"
             echo
-            echo "**${summary:-The plan failed.}** Commit ${SHA:0:7}, [run]($RUN_URL)."
-            [ "$DESTROY" = true ] && echo && echo "The root is deleted by this PR, so this is a destroy plan from \`main\`'s copy."
-            echo
-            echo "<details><summary>Full plan</summary>"
-            echo
-            echo '```text'
-            head -c 50000 "$log"
-            echo '```'
-            echo "</details>"
-            echo
-            if [ "$MODE" = pr ]; then
+            if [ "$NEW" = true ]; then
+              echo "**New root: its state doesn't exist yet, so it isn't planned.** Commit ${SHA:0:7}, [run]($RUN_URL)."
+              echo
+              echo "The first \`/apply\`, once approved in \`$ENVIRONMENT\`, only creates the empty state. The next \`/apply\` plans the root, runs the checks and applies it after a second approval (08 section 7)."
+            else
+              echo "**${summary:-The plan failed.}** Commit ${SHA:0:7}, [run]($RUN_URL)."
+              [ "$DESTROY" = true ] && echo && echo "The root is deleted by this PR, so this is a destroy plan from \`main\`'s copy."
+              echo
+              echo "<details><summary>Full plan</summary>"
+              echo
+              echo '```text'
+              if [ -f "$log" ]; then head -c 50000 "$log"; fi
+              echo '```'
+              echo "</details>"
+              echo
               echo "**Checks:** policy/trusted-code.rego passed, plan ${PLAN_OUTCOME:-skipped}, conftest ${CONFTEST_OUTCOME:-skipped}."
               if [ -s "$RUNNER_TEMP/conftest.txt" ] && [ "$CONFTEST_OUTCOME" = failure ]; then
                 echo; echo '```text'; head -c 5000 "$RUNNER_TEMP/conftest.txt"; echo '```'
               fi
+            fi
+            if [ "$MODE" = pr ] && [ "$NEW" != true ]; then
               echo
               echo "**Infracost** (monthly cost change)"
               echo
