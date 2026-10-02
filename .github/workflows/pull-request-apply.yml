@@ -1,0 +1,335 @@
+name: Pull Request Apply
+run-name: "Pull Request Apply #${{ github.event.issue.number }}"
+
+# Started by a /apply comment on an approved PR. issue_comment always runs this
+# file from main, so a PR can't change the apply steps (ADR 0045). Applies the
+# roots layer by layer (08 section 6), each in its Environment through
+# shared-apply.yml@main, and sets the commit status `applied` (08 section 4).
+# When every root is applied, it merges the PR (ADR 0056).
+#
+# The first layer with roots applies the PR's saved plans. Each later layer is
+# planned again after the layer before it, and so is every layer when the head
+# commit already has an `applied` status from an earlier /apply, for example
+# after a stale plan.
+#
+# The second stamps pass plans and applies the PR's stamps again once global
+# is applied. Stamps outside the PR whose inputs global changed are found from
+# global's JSON plan, which is built with the global roots.
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+jobs:
+  guard:
+    name: guard
+    if: github.event.issue.pull_request && startsWith(github.event.comment.body, '/apply')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+      statuses: write
+    outputs:
+      authorized: ${{ steps.who.outputs.authorized }}
+      sha: ${{ steps.pr.outputs.sha }}
+      replan: ${{ steps.layers.outputs.replan }}
+      platform: ${{ steps.layers.outputs.platform }}
+      landingzones: ${{ steps.layers.outputs.landingzones }}
+      stamps: ${{ steps.layers.outputs.stamps }}
+      global: ${{ steps.layers.outputs.global }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      PR: ${{ github.event.issue.number }}
+      COMMENTER: ${{ github.event.comment.user.login }}
+    steps:
+      - name: Check the commenter and the PR's source
+        id: who
+        run: |
+          permission=$(gh api "repos/$GH_REPO/collaborators/$COMMENTER/permission" --jq .permission)
+          case "$permission" in
+            admin | maintain | write) ;;
+            *) echo "::error::$COMMENTER has $permission access; /apply needs write"; exit 1 ;;
+          esac
+          head_repo=$(gh api "repos/$GH_REPO/pulls/$PR" --jq .head.repo.full_name)
+          if [ "$head_repo" != "$GH_REPO" ]; then echo "::error::PRs from forks are never applied"; exit 1; fi
+          echo "authorized=true" >> "$GITHUB_OUTPUT"
+
+      - name: Check the PR
+        id: pr
+        run: |
+          gh pr view "$PR" --json state,reviewDecision,headRefOid > "$RUNNER_TEMP/pr.json"
+          state=$(jq -r .state "$RUNNER_TEMP/pr.json")
+          decision=$(jq -r .reviewDecision "$RUNNER_TEMP/pr.json")
+          sha=$(jq -r .headRefOid "$RUNNER_TEMP/pr.json")
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          if [ "$state" != OPEN ]; then echo "::error::the PR is $state"; exit 1; fi
+          if [ "$decision" != APPROVED ]; then echo "::error::the PR needs a CODEOWNERS approval first (review decision: ${decision:-none})"; exit 1; fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Detect the roots with main's find-changed-files.sh
+        id: layers
+        env:
+          SHA: ${{ steps.pr.outputs.sha }}
+        run: |
+          git fetch --no-tags origin "+refs/pull/$PR/head:refs/remotes/pr/head"
+          [ "$(git rev-parse pr/head)" = "$SHA" ] || { echo "::error::the PR moved while /apply started: comment /apply again"; exit 1; }
+          roots=$(bash .github/scripts/find-changed-files.sh origin/main "$SHA")
+          echo "Roots: $roots"
+          if [ "$roots" != "[]" ]; then
+            plans=$(gh api "repos/$GH_REPO/actions/workflows/pull-request-plan.yml/runs?head_sha=$SHA&event=pull_request&status=success&per_page=1" --jq .total_count)
+            if [ "$plans" = 0 ]; then echo "::error::no successful plan for the head commit ${SHA:0:7}: push or re-run the plan"; exit 1; fi
+          fi
+          earlier=$(gh api "repos/$GH_REPO/commits/$SHA/statuses" --jq '[.[] | select(.context == "applied")] | length')
+          {
+            echo "replan=$([ "$earlier" -gt 0 ] && echo true || echo false)"
+            for layer in platform landingzones stamps global; do
+              echo "$layer=$(jq -c --arg l "$layer" '[.[] | select(
+                (if (.root | startswith("landing-zones/")) then "landingzones" else (.root | split("/")[0]) end) == $l)]' <<< "$roots")"
+            done
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set applied to pending
+        env:
+          SHA: ${{ steps.pr.outputs.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: gh api "repos/$GH_REPO/statuses/$SHA" -f state=pending -f context=applied -f description="Applying" -f target_url="$RUN_URL" --silent
+
+  # 1. platform: in order, one root at a time.
+  plan-platform:
+    name: plan (${{ matrix.root }})
+    needs: guard
+    if: needs.guard.outputs.platform != '[]' && needs.guard.outputs.replan == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.guard.outputs.platform) }}
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-plan.yml@main
+    with:
+      root: ${{ matrix.root }}
+    secrets: inherit
+
+  apply-platform:
+    name: apply (${{ matrix.root }})
+    needs: [guard, plan-platform]
+    if: "!cancelled() && needs.guard.result == 'success' && needs.guard.outputs.platform != '[]' && !contains(needs.*.result, 'failure')"
+    strategy:
+      fail-fast: true
+      max-parallel: 1
+      matrix:
+        include: ${{ fromJSON(needs.guard.outputs.platform) }}
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+      actions: read
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-apply.yml@main
+    with:
+      root: ${{ matrix.root }}
+    secrets: inherit
+
+  # 2. landingzones: every changed landing zone key in parallel.
+  plan-landingzones:
+    name: plan (${{ matrix.root }} ${{ matrix.key }})
+    needs: [guard, plan-platform, apply-platform]
+    if: >-
+      !cancelled() && needs.guard.result == 'success' && needs.guard.outputs.landingzones != '[]' && !contains(needs.*.result, 'failure')
+      && (needs.guard.outputs.replan == 'true' || needs.apply-platform.result == 'success')
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.guard.outputs.landingzones) }}
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-plan.yml@main
+    with:
+      root: ${{ matrix.root }}
+      key: ${{ matrix.key }}
+    secrets: inherit
+
+  apply-landingzones:
+    name: apply (${{ matrix.root }} ${{ matrix.key }})
+    needs: [guard, plan-platform, apply-platform, plan-landingzones]
+    if: "!cancelled() && needs.guard.result == 'success' && needs.guard.outputs.landingzones != '[]' && !contains(needs.*.result, 'failure')"
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.guard.outputs.landingzones) }}
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+      actions: read
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-apply.yml@main
+    with:
+      root: ${{ matrix.root }}
+      key: ${{ matrix.key }}
+    secrets: inherit
+
+  # 3. stamps: every changed stamp in parallel.
+  plan-stamps:
+    name: plan (${{ matrix.root }})
+    needs: [guard, plan-platform, apply-platform, plan-landingzones, apply-landingzones]
+    if: >-
+      !cancelled() && needs.guard.result == 'success' && needs.guard.outputs.stamps != '[]' && !contains(needs.*.result, 'failure')
+      && (needs.guard.outputs.replan == 'true' || needs.apply-platform.result == 'success' || needs.apply-landingzones.result == 'success')
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.guard.outputs.stamps) }}
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-plan.yml@main
+    with:
+      root: ${{ matrix.root }}
+    secrets: inherit
+
+  apply-stamps:
+    name: apply (${{ matrix.root }})
+    needs: [guard, plan-platform, apply-platform, plan-landingzones, apply-landingzones, plan-stamps]
+    if: "!cancelled() && needs.guard.result == 'success' && needs.guard.outputs.stamps != '[]' && !contains(needs.*.result, 'failure')"
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.guard.outputs.stamps) }}
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+      actions: read
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-apply.yml@main
+    with:
+      root: ${{ matrix.root }}
+    secrets: inherit
+
+  # 4. global: in order, one root at a time.
+  plan-global:
+    name: plan (${{ matrix.root }})
+    needs: [guard, plan-platform, apply-platform, plan-landingzones, apply-landingzones, plan-stamps, apply-stamps]
+    if: >-
+      !cancelled() && needs.guard.result == 'success' && needs.guard.outputs.global != '[]' && !contains(needs.*.result, 'failure')
+      && (needs.guard.outputs.replan == 'true' || needs.apply-platform.result == 'success' || needs.apply-landingzones.result == 'success' || needs.apply-stamps.result == 'success')
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.guard.outputs.global) }}
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-plan.yml@main
+    with:
+      root: ${{ matrix.root }}
+    secrets: inherit
+
+  apply-global:
+    name: apply (${{ matrix.root }})
+    needs: [guard, plan-platform, apply-platform, plan-landingzones, apply-landingzones, plan-stamps, apply-stamps, plan-global]
+    if: "!cancelled() && needs.guard.result == 'success' && needs.guard.outputs.global != '[]' && !contains(needs.*.result, 'failure')"
+    strategy:
+      fail-fast: true
+      max-parallel: 1
+      matrix:
+        include: ${{ fromJSON(needs.guard.outputs.global) }}
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+      actions: read
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-apply.yml@main
+    with:
+      root: ${{ matrix.root }}
+    secrets: inherit
+
+  # 5. stamps, second pass: after global, the PR's stamps are planned and applied again.
+  plan-stamps-again:
+    name: plan again (${{ matrix.root }})
+    needs: [guard, apply-global]
+    if: "!cancelled() && needs.apply-global.result == 'success' && needs.guard.outputs.stamps != '[]'"
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.guard.outputs.stamps) }}
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-plan.yml@main
+    with:
+      root: ${{ matrix.root }}
+    secrets: inherit
+
+  apply-stamps-again:
+    name: apply again (${{ matrix.root }})
+    needs: [guard, apply-global, plan-stamps-again]
+    if: "!cancelled() && needs.plan-stamps-again.result == 'success'"
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.guard.outputs.stamps) }}
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+      actions: read
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-apply.yml@main
+    with:
+      root: ${{ matrix.root }}
+    secrets: inherit
+
+  applied:
+    name: applied
+    needs: [guard, plan-platform, apply-platform, plan-landingzones, apply-landingzones, plan-stamps, apply-stamps, plan-global, apply-global, plan-stamps-again, apply-stamps-again]
+    # A comment by someone without write access, or on a fork's PR, changes no status.
+    if: always() && needs.guard.outputs.authorized == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      statuses: write
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      PR: ${{ github.event.issue.number }}
+      RESULTS: ${{ join(needs.*.result, ' ') }}
+      SHA: ${{ needs.guard.outputs.sha }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Set the applied status
+        run: |
+          echo "Results: $RESULTS"
+          if [ -z "$SHA" ]; then echo "::error::the guard found no head commit"; exit 1; fi
+          if grep -qE 'failure|cancelled' <<< "$RESULTS"; then
+            gh api "repos/$GH_REPO/statuses/$SHA" -f state=failure -f context=applied -f description="Not applied: see the run" -f target_url="$RUN_URL" --silent
+            exit 1
+          fi
+          gh api "repos/$GH_REPO/statuses/$SHA" -f state=success -f context=applied -f description="Every root is applied" -f target_url="$RUN_URL" --silent
+
+      # Merge at once, so main matches what runs (ADR 0056). GITHUB_TOKEN can't
+      # write workflow files, so a .github/** PR is merged by its author.
+      - name: Merge the PR
+        run: |
+          if gh pr diff "$PR" --name-only | grep -q '^\.github/'; then
+            gh pr comment "$PR" --body "Applied. This PR changes \`.github/**\`, so the author merges it by hand."
+            exit 0
+          fi
+          gh pr merge "$PR" --squash --delete-branch --match-head-commit "$SHA" || {
+            gh pr comment "$PR" --body "Applied, but the merge failed: $RUN_URL. Fix the cause, for example a conflict with main, push, and comment /apply again: the new plan shows no changes and the PR merges."
+            exit 1
+          }

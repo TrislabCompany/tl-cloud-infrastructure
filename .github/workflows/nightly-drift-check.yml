@@ -1,0 +1,109 @@
+name: Nightly Drift Check
+
+# Every night, plans every root on main with its plan identity and opens,
+# updates or closes one `drift` Issue per root (08 section 8). A layer whose
+# plan identity doesn't exist yet is skipped. Also runs the deployment audit.
+# The caps and stray-subscription checks need a plan identity's token, which
+# only shared-plan.yml gets, so they are added there with the identities
+# they use.
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: nightly-drift-check
+  cancel-in-progress: false
+
+jobs:
+  roots:
+    name: roots
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      roots: ${{ steps.detect.outputs.roots }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: List every root on main
+        id: detect
+        env:
+          GLOBAL: ${{ vars.AZURE_CLIENT_ID_GLOBAL_PLAN }}
+          PLATFORM: ${{ vars.AZURE_CLIENT_ID_PLATFORM_PLAN }}
+          LANDINGZONES: ${{ vars.AZURE_CLIENT_ID_LANDINGZONES_PLAN }}
+        run: |
+          all=$(bash .github/scripts/find-changed-files.sh --all HEAD)
+          # Skip a layer whose plan client ID variable isn't set yet. Stamps are
+          # checked per landing zone inside shared-plan.yml.
+          roots=$(jq -c --arg g "$GLOBAL" --arg p "$PLATFORM" --arg l "$LANDINGZONES" '[.[] | select(
+            (.root | startswith("global/") | not) or $g != "") | select(
+            (.root | startswith("platform/") | not) or $p != "") | select(
+            (.root | startswith("landing-zones/") | not) or $l != "") | select(
+            .root | startswith("platform/gcp/") | not)]' <<< "$all")
+          echo "Roots: $roots"
+          echo "roots=$roots" >> "$GITHUB_OUTPUT"
+
+  drift:
+    name: drift (${{ matrix.root }}${{ matrix.key && format(' {0}', matrix.key) || '' }})
+    needs: roots
+    if: needs.roots.outputs.roots != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.roots.outputs.roots) }}
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-plan.yml@main
+    with:
+      root: ${{ matrix.root }}
+      key: ${{ matrix.key || '' }}
+    secrets: inherit
+
+  deployment-audit:
+    name: deployment audit
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      deployments: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Find deployments from other workflows
+        run: |
+          # A deployment to a protected Environment from any workflow other than
+          # Pull Request Apply opens a `security` Issue (08 section 8, ADR 0045).
+          since=$(date -u -d '-2 days' +%Y-%m-%dT%H:%M:%SZ)
+          gh label create security --color B60205 --description "Found by the nightly deployment audit" 2>/dev/null || true
+          envs=$(gh api "repos/$GH_REPO/environments" --paginate --jq '.environments[].name' | grep -E '^(global|platform|landingzones|lz-.+)$' || true)
+          for env in $envs; do
+            findings=""
+            for id in $(gh api "repos/$GH_REPO/deployments?environment=$env&per_page=100" --jq ".[] | select(.created_at >= \"$since\") | .id"); do
+              url=$(gh api "repos/$GH_REPO/deployments/$id/statuses" --jq '[.[] | (.log_url // .target_url // "")] | map(select(. != "")) | first // ""')
+              run_id=$(sed -n 's|.*/actions/runs/\([0-9]*\).*|\1|p' <<< "$url")
+              if [ -z "$run_id" ]; then
+                findings+="- Deployment $id: not made by a workflow run"$'\n'
+                continue
+              fi
+              read -r path event < <(gh api "repos/$GH_REPO/actions/runs/$run_id" --jq '[.path, .event] | @tsv')
+              if [ "$path" != .github/workflows/pull-request-apply.yml ] || [ "$event" != issue_comment ]; then
+                findings+="- Deployment $id from \`$path\` ($event): $url"$'\n'
+              fi
+            done
+            if [ -z "$findings" ]; then continue; fi
+            echo "::warning::$env: deployments from other workflows"
+            title="Deployment: $env"
+            body="Deployments to the protected Environment \`$env\` that did not come from Pull Request Apply, in the last two days:"$'\n\n'"$findings"$'\n'"Reviewers approve only runs of Pull Request Apply (08 section 5)."
+            number=$(gh issue list --label security --state open --limit 200 --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -1)
+            if [ -n "$number" ]; then gh issue edit "$number" --body "$body"; else gh issue create --title "$title" --label security --body "$body"; fi
+          done
