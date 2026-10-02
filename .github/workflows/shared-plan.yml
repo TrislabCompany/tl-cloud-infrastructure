@@ -255,12 +255,18 @@ jobs:
         if: steps.layer.outputs.mode == 'pr' && steps.plan.outcome == 'success'
         working-directory: ${{ steps.dir.outputs.path }}
         run: |
-          # main's rules, the PR's catalog/ (08 section 3, Checks on every plan).
+          # main's rules, with the PR's catalog/ as data.pr and main's as data.main,
+          # so the rules can compare the two (08 section 3, Checks on every plan).
           tofu show -json tfplan > "$RUNNER_TEMP/plan.json"
-          data=()
-          if [ -d "$GITHUB_WORKSPACE/src/catalog" ]; then data=(--data "$GITHUB_WORKSPACE/src/catalog"); fi
+          mkdir -p "$RUNNER_TEMP/catalog"
+          for side in pr:src main:main; do
+            for f in "$GITHUB_WORKSPACE/${side#*:}/catalog/"*.yaml; do
+              [ -e "$f" ] || continue
+              yq -o=json "{\"${side%%:*}\": .}" "$f" > "$RUNNER_TEMP/catalog/${side%%:*}-$(basename "$f" .yaml).json"
+            done
+          done
           set +e
-          conftest test --no-color "$RUNNER_TEMP/plan.json" --policy "$GITHUB_WORKSPACE/main/policy" "${data[@]}" \
+          conftest test --no-color "$RUNNER_TEMP/plan.json" --policy "$GITHUB_WORKSPACE/main/policy" --data "$RUNNER_TEMP/catalog" \
             --namespace naming --namespace tags --namespace regions --namespace catalog > "$RUNNER_TEMP/conftest.txt" 2>&1
           code=$?
           set -e
