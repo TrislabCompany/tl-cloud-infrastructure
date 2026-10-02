@@ -1,4 +1,4 @@
-package code
+package trusted_code
 
 good_root := {
 	"terraform": [{

@@ -1,9 +1,9 @@
 # Static check of a root's code, run before any sign-in (ADR 0045).
 #
-#   conftest test --parser hcl2 --policy <main checkout>/policy --namespace code <files>
+#   conftest test --parser hcl2 --policy <main checkout>/policy --namespace trusted_code <files>
 #
 # Each .tf or .tofu file is checked on its own, as parsed by the hcl2 parser.
-package code
+package trusted_code
 
 # Providers a root may use, by local name. "terraform" is the built-in
 # provider of terraform_data.

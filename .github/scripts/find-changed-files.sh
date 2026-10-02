@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Maps changed files to the roots they touch (08 section 2).
 #
-#   detect.sh <base> <head>   roots touched by the changes from the merge base of <base> and <head> to <head>
-#   detect.sh --all <ref>     every root on <ref>, for the drift job
+#   find-changed-files.sh <base> <head>   roots touched by the changes from the merge base of <base> and <head> to <head>
+#   find-changed-files.sh --all <ref>     every root on <ref>, for the drift job
 #
 # Prints a JSON list of { root, key } in the order of 08 section 6. `key` is set
 # only for landing-zones/_root. A root that exists neither on <base> nor on
@@ -193,6 +193,6 @@ if len(args) == 2 and args[0] == "--all":
 elif len(args) == 2:
     emit(changed_roots(args[0], args[1]))
 else:
-    print(__doc__ or "usage: detect.sh <base> <head> | detect.sh --all <ref>", file=sys.stderr)
+    print(__doc__ or "usage: find-changed-files.sh <base> <head> | find-changed-files.sh --all <ref>", file=sys.stderr)
     sys.exit(2)
 PY

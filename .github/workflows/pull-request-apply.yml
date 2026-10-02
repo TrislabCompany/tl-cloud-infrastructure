@@ -1,10 +1,10 @@
-name: Tofu Apply
-run-name: "Tofu Apply #${{ github.event.issue.number }}"
+name: Pull Request Apply
+run-name: "Pull Request Apply #${{ github.event.issue.number }}"
 
 # Started by a /apply comment on an approved PR. issue_comment always runs this
 # file from main, so a PR can't change the apply steps (ADR 0045). Applies the
 # roots layer by layer (08 section 6), each in its Environment through
-# tofu-apply-root.yml@main, and sets the commit status `applied` (08 section 4).
+# shared-apply.yml@main, and sets the commit status `applied` (08 section 4).
 #
 # The first layer with roots applies the PR's saved plans. Each later layer is
 # planned again after the layer before it, and so is every layer when the head
@@ -74,17 +74,17 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Detect the roots with main's detect.sh
+      - name: Detect the roots with main's find-changed-files.sh
         id: layers
         env:
           SHA: ${{ steps.pr.outputs.sha }}
         run: |
           git fetch --no-tags origin "+refs/pull/$PR/head:refs/remotes/pr/head"
           [ "$(git rev-parse pr/head)" = "$SHA" ] || { echo "::error::the PR moved while /apply started: comment /apply again"; exit 1; }
-          roots=$(bash .github/scripts/detect.sh origin/main "$SHA")
+          roots=$(bash .github/scripts/find-changed-files.sh origin/main "$SHA")
           echo "Roots: $roots"
           if [ "$roots" != "[]" ]; then
-            plans=$(gh api "repos/$GH_REPO/actions/workflows/tofu-plan.yml/runs?head_sha=$SHA&event=pull_request&status=success&per_page=1" --jq .total_count)
+            plans=$(gh api "repos/$GH_REPO/actions/workflows/pull-request-plan.yml/runs?head_sha=$SHA&event=pull_request&status=success&per_page=1" --jq .total_count)
             if [ "$plans" = 0 ]; then echo "::error::no successful plan for the head commit ${SHA:0:7}: push or re-run the plan"; exit 1; fi
           fi
           earlier=$(gh api "repos/$GH_REPO/commits/$SHA/statuses" --jq '[.[] | select(.context == "applied")] | length')
@@ -115,7 +115,7 @@ jobs:
       contents: read
       id-token: write
       pull-requests: write
-    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/tofu-plan-root.yml@main
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-plan.yml@main
     with:
       root: ${{ matrix.root }}
     secrets: inherit
@@ -134,7 +134,7 @@ jobs:
       id-token: write
       pull-requests: write
       actions: read
-    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/tofu-apply-root.yml@main
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-apply.yml@main
     with:
       root: ${{ matrix.root }}
     secrets: inherit
@@ -154,7 +154,7 @@ jobs:
       contents: read
       id-token: write
       pull-requests: write
-    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/tofu-plan-root.yml@main
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-plan.yml@main
     with:
       root: ${{ matrix.root }}
       key: ${{ matrix.key }}
@@ -173,7 +173,7 @@ jobs:
       id-token: write
       pull-requests: write
       actions: read
-    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/tofu-apply-root.yml@main
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-apply.yml@main
     with:
       root: ${{ matrix.root }}
       key: ${{ matrix.key }}
@@ -194,7 +194,7 @@ jobs:
       contents: read
       id-token: write
       pull-requests: write
-    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/tofu-plan-root.yml@main
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-plan.yml@main
     with:
       root: ${{ matrix.root }}
     secrets: inherit
@@ -212,7 +212,7 @@ jobs:
       id-token: write
       pull-requests: write
       actions: read
-    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/tofu-apply-root.yml@main
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-apply.yml@main
     with:
       root: ${{ matrix.root }}
     secrets: inherit
@@ -232,7 +232,7 @@ jobs:
       contents: read
       id-token: write
       pull-requests: write
-    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/tofu-plan-root.yml@main
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-plan.yml@main
     with:
       root: ${{ matrix.root }}
     secrets: inherit
@@ -251,7 +251,7 @@ jobs:
       id-token: write
       pull-requests: write
       actions: read
-    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/tofu-apply-root.yml@main
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-apply.yml@main
     with:
       root: ${{ matrix.root }}
     secrets: inherit
@@ -269,7 +269,7 @@ jobs:
       contents: read
       id-token: write
       pull-requests: write
-    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/tofu-plan-root.yml@main
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-plan.yml@main
     with:
       root: ${{ matrix.root }}
     secrets: inherit
@@ -287,7 +287,7 @@ jobs:
       id-token: write
       pull-requests: write
       actions: read
-    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/tofu-apply-root.yml@main
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-apply.yml@main
     with:
       root: ${{ matrix.root }}
     secrets: inherit

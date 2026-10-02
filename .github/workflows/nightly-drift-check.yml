@@ -1,10 +1,10 @@
-name: Tofu Drift
+name: Nightly Drift Check
 
 # Every night, plans every root on main with its plan identity and opens,
 # updates or closes one `drift` Issue per root (08 section 8). A layer whose
 # plan identity doesn't exist yet is skipped. Also runs the deployment audit.
 # The caps and stray-subscription checks need a plan identity's token, which
-# only tofu-plan-root.yml gets, so they are added there with the identities
+# only shared-plan.yml gets, so they are added there with the identities
 # they use.
 
 on:
@@ -15,7 +15,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: tofu-drift
+  group: nightly-drift-check
   cancel-in-progress: false
 
 jobs:
@@ -39,9 +39,9 @@ jobs:
           PLATFORM: ${{ vars.AZURE_CLIENT_ID_PLATFORM_PLAN }}
           LANDINGZONES: ${{ vars.AZURE_CLIENT_ID_LANDINGZONES_PLAN }}
         run: |
-          all=$(bash .github/scripts/detect.sh --all HEAD)
+          all=$(bash .github/scripts/find-changed-files.sh --all HEAD)
           # Skip a layer whose plan client ID variable isn't set yet. Stamps are
-          # checked per landing zone inside tofu-plan-root.yml.
+          # checked per landing zone inside shared-plan.yml.
           roots=$(jq -c --arg g "$GLOBAL" --arg p "$PLATFORM" --arg l "$LANDINGZONES" '[.[] | select(
             (.root | startswith("global/") | not) or $g != "") | select(
             (.root | startswith("platform/") | not) or $p != "") | select(
@@ -62,7 +62,7 @@ jobs:
       contents: read
       id-token: write
       issues: write
-    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/tofu-plan-root.yml@main
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-plan.yml@main
     with:
       root: ${{ matrix.root }}
       key: ${{ matrix.key || '' }}
@@ -82,7 +82,7 @@ jobs:
       - name: Find deployments from other workflows
         run: |
           # A deployment to a protected Environment from any workflow other than
-          # Tofu Apply opens a `security` Issue (08 section 8, ADR 0045).
+          # Pull Request Apply opens a `security` Issue (08 section 8, ADR 0045).
           since=$(date -u -d '-2 days' +%Y-%m-%dT%H:%M:%SZ)
           gh label create security --color B60205 --description "Found by the nightly deployment audit" 2>/dev/null || true
           envs=$(gh api "repos/$GH_REPO/environments" --paginate --jq '.environments[].name' | grep -E '^(global|platform|landingzones|lz-.+)$' || true)
@@ -96,14 +96,14 @@ jobs:
                 continue
               fi
               read -r path event < <(gh api "repos/$GH_REPO/actions/runs/$run_id" --jq '[.path, .event] | @tsv')
-              if [ "$path" != .github/workflows/tofu-apply.yml ] || [ "$event" != issue_comment ]; then
+              if [ "$path" != .github/workflows/pull-request-apply.yml ] || [ "$event" != issue_comment ]; then
                 findings+="- Deployment $id from \`$path\` ($event): $url"$'\n'
               fi
             done
             if [ -z "$findings" ]; then continue; fi
             echo "::warning::$env: deployments from other workflows"
             title="Deployment: $env"
-            body="Deployments to the protected Environment \`$env\` that did not come from Tofu Apply, in the last two days:"$'\n\n'"$findings"$'\n'"Reviewers approve only runs of Tofu Apply (08 section 5)."
+            body="Deployments to the protected Environment \`$env\` that did not come from Pull Request Apply, in the last two days:"$'\n\n'"$findings"$'\n'"Reviewers approve only runs of Pull Request Apply (08 section 5)."
             number=$(gh issue list --label security --state open --limit 200 --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -1)
             if [ -n "$number" ]; then gh issue edit "$number" --body "$body"; else gh issue create --title "$title" --label security --body "$body"; fi
           done

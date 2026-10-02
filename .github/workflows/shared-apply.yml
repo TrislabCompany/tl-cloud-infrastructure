@@ -1,7 +1,7 @@
-name: Tofu Apply Root
+name: Shared Apply
 
 # Applies one root's saved plan for the PR's head commit, in the root's
-# Environment (08 sections 4 and 5). Called only by tofu-apply.yml, at @main,
+# Environment (08 sections 4 and 5). Called only by pull-request-apply.yml, at @main,
 # and the apply identities' federated credentials trust only this file on
 # refs/heads/main (ADR 0045). The caller passes the root and key; the
 # Environment, identity, state and passphrase come from the layer table below.
@@ -85,7 +85,7 @@ jobs:
       - name: Read the PR
         id: pr
         run: |
-          [ -n "$PR" ] || { echo "::error::tofu-apply-root.yml runs only from a /apply comment"; exit 1; }
+          [ -n "$PR" ] || { echo "::error::shared-apply.yml runs only from a /apply comment"; exit 1; }
           gh api "repos/$GH_REPO/pulls/$PR" > "$RUNNER_TEMP/pr.json"
           echo "sha=$(jq -r .head.sha "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
 
@@ -135,13 +135,13 @@ jobs:
       - name: Install conftest
         run: bash main/.github/scripts/install-tool.sh conftest "$CONFTEST_VERSION"
 
-      - name: Check the code with policy/code.rego
+      - name: Check the code with policy/trusted-code.rego
         working-directory: ${{ steps.dir.outputs.base }}
         run: |
           json=$(find . -path ./.git -prune -o -path '*/.terraform' -prune -o \( -name '*.tf.json' -o -name '*.tofu.json' \) -print)
           if [ -n "$json" ]; then echo "::error::JSON configuration files are not allowed: $json"; exit 1; fi
           mapfile -t files < <(find . -path ./.git -prune -o -path '*/.terraform' -prune -o \( -name '*.tf' -o -name '*.tofu' \) -print)
-          conftest test --no-color --parser hcl2 --policy "$GITHUB_WORKSPACE/main/policy" --namespace code "${files[@]}"
+          conftest test --no-color --parser hcl2 --policy "$GITHUB_WORKSPACE/main/policy" --namespace trusted_code "${files[@]}"
 
       - name: Download the saved plan of this run
         id: this_run
@@ -158,7 +158,7 @@ jobs:
         env:
           SHA: ${{ steps.pr.outputs.sha }}
         run: |
-          run_id=$(gh api "repos/$GH_REPO/actions/workflows/tofu-plan.yml/runs?head_sha=$SHA&event=pull_request&status=success&per_page=1" \
+          run_id=$(gh api "repos/$GH_REPO/actions/workflows/pull-request-plan.yml/runs?head_sha=$SHA&event=pull_request&status=success&per_page=1" \
             --jq '.workflow_runs[0].id // empty')
           if [ -z "$run_id" ]; then echo "::error::no successful plan for the head commit ${SHA:0:7}: push or re-run the plan"; exit 1; fi
           echo "run_id=$run_id" >> "$GITHUB_OUTPUT"

@@ -1,4 +1,4 @@
-name: Tofu Plan
+name: Pull Request Plan
 
 # Plans every root a PR touches, each with its layer's plan identity, and runs
 # the checks (08 sections 2 to 4). The summary jobs `plan` and `conftest` are
@@ -11,7 +11,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: tofu-plan-${{ github.event.pull_request.number }}
+  group: pull-request-plan-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 env:
@@ -41,7 +41,7 @@ jobs:
           BASE: origin/${{ github.event.pull_request.base.ref }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          roots=$(bash .github/scripts/detect.sh "$BASE" "$HEAD")
+          roots=$(bash .github/scripts/find-changed-files.sh "$BASE" "$HEAD")
           echo "Roots: $roots"
           changed=$(git diff --name-only --no-renames "$(git merge-base "$BASE" "$HEAD")" "$HEAD")
           {
@@ -62,7 +62,7 @@ jobs:
       contents: read
       id-token: write
       pull-requests: write
-    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/tofu-plan-root.yml@main
+    uses: TrislabCompany/tl-cloud-infrastructure/.github/workflows/shared-plan.yml@main
     with:
       root: ${{ matrix.root }}
       key: ${{ matrix.key || '' }}

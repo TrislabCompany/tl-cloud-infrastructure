@@ -1,4 +1,4 @@
-name: Prowler IaC Scan
+name: Pull Request Security Scan
 
 # Prowler IaC scan of the roots a PR changes (08 section 3, Checks on every
 # plan). Fails on a `high` or `critical` finding that the root's
@@ -50,7 +50,7 @@ jobs:
           BASE: origin/${{ github.event.pull_request.base.ref }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          roots=$(bash .github/scripts/detect.sh "$BASE" "$HEAD")
+          roots=$(bash .github/scripts/find-changed-files.sh "$BASE" "$HEAD")
           # Scan each changed folder once, and only if it is still on the branch.
           dirs=$(jq -r '.[].root' <<< "$roots" | sort -u | while read -r d; do [ -d "$d" ] && echo "$d"; done | paste -sd ' ' -)
           echo "Folders to scan: ${dirs:-none}"

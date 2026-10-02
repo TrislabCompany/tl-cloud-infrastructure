@@ -1,4 +1,4 @@
-name: Tofu Plan Root
+name: Shared Plan
 
 # Plans one root with its layer's plan identity (08 sections 2 and 3). Callers
 # reference this file at @main, and the plan identities' federated credentials
@@ -110,14 +110,14 @@ jobs:
       - name: Install conftest
         run: bash main/.github/scripts/install-tool.sh conftest "$CONFTEST_VERSION"
 
-      - name: Check the code with policy/code.rego
+      - name: Check the code with policy/trusted-code.rego
         working-directory: ${{ steps.dir.outputs.base }}
         run: |
           # Every .tf and .tofu file of the checkout, so local modules are checked too (ADR 0045).
           json=$(find . -path ./.git -prune -o -path '*/.terraform' -prune -o \( -name '*.tf.json' -o -name '*.tofu.json' \) -print)
           if [ -n "$json" ]; then echo "::error::JSON configuration files are not allowed: $json"; exit 1; fi
           mapfile -t files < <(find . -path ./.git -prune -o -path '*/.terraform' -prune -o \( -name '*.tf' -o -name '*.tofu' \) -print)
-          conftest test --no-color --parser hcl2 --policy "$GITHUB_WORKSPACE/main/policy" --namespace code "${files[@]}"
+          conftest test --no-color --parser hcl2 --policy "$GITHUB_WORKSPACE/main/policy" --namespace trusted_code "${files[@]}"
 
       - name: Sign in as tl-landingzones-plan
         id: app
@@ -328,7 +328,7 @@ jobs:
             echo "</details>"
             echo
             if [ "$MODE" = pr ]; then
-              echo "**Checks:** policy/code.rego passed, plan ${PLAN_OUTCOME:-skipped}, conftest ${CONFTEST_OUTCOME:-skipped}."
+              echo "**Checks:** policy/trusted-code.rego passed, plan ${PLAN_OUTCOME:-skipped}, conftest ${CONFTEST_OUTCOME:-skipped}."
               if [ -s "$RUNNER_TEMP/conftest.txt" ] && [ "$CONFTEST_OUTCOME" = failure ]; then
                 echo; echo '```text'; head -c 5000 "$RUNNER_TEMP/conftest.txt"; echo '```'
               fi
@@ -362,7 +362,7 @@ jobs:
         run: |
           # 08 section 8: one Issue per root, labelled drift, titled "Drift: <root or key>".
           title="Drift: $NAME"
-          gh label create drift --color D93F0B --description "Live state differs from main (tofu-drift.yml)" 2>/dev/null || true
+          gh label create drift --color D93F0B --description "Live state differs from main (nightly-drift-check.yml)" 2>/dev/null || true
           number=$(gh issue list --label drift --state open --limit 200 --json number,title \
             --jq ".[] | select(.title == \"$title\") | .number" | head -1)
           log=$RUNNER_TEMP/plan.txt; [ -f "$log" ] || log=$RUNNER_TEMP/plan.log
