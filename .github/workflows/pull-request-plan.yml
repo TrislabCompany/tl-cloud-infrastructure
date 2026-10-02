@@ -50,6 +50,19 @@ jobs:
             echo "workflows=$(grep -qE '^(\.github/|renovate\.json$)' <<< "$changed" && echo true || echo false)"
           } >> "$GITHUB_OUTPUT"
 
+  # Phase 2 guard test (step A5.1): a job a PR adds must not get a token. Not merged.
+  oidc-guard-test:
+    name: oidc guard test
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write
+    steps:
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID_PLATFORM_PLAN }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
   roots:
     name: plan (${{ matrix.root }}${{ matrix.key && format(' {0}', matrix.key) || '' }})
     needs: detect
