@@ -1,0 +1,15 @@
+# Register of allowed regions and their codes (07 section 10). Only EU regions
+# (N6), checked by policy/regions.rego.
+regions:
+  - name: northeurope
+    cloud: azure
+    code: neu
+    state: active
+  - name: italynorth
+    cloud: azure
+    code: itn
+    state: active
+  - name: europe-west8
+    cloud: gcp
+    code: euw8
+    state: active

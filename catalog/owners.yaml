@@ -1,0 +1,8 @@
+# Register of owner codes (07 section 9). An entry is added by the PR that
+# onboards the customer or product, and never deleted: offboarding sets
+# state: retired, so the code is never reused.
+owners:
+  - slug: website-trislab
+    kind: product
+    code: web
+    state: active
