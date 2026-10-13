@@ -86,7 +86,7 @@ resource "azurerm_management_group" "decommissioned" {
 
 import {
   to = azurerm_management_group_subscription_association.platform
-  id = "/managementGroup/mg-platform/subscription/${data.azurerm_subscription.current.subscription_id}"
+  id = "/providers/Microsoft.Management/managementGroups/mg-platform/subscriptions/${data.azurerm_subscription.current.subscription_id}"
 }
 
 resource "azurerm_management_group_subscription_association" "platform" {
