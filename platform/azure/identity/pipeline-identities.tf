@@ -139,7 +139,7 @@ resource "azuread_service_principal" "this" {
 import {
   for_each = merge([
     for id, s in local.seed : {
-      for name, credential in s.credentials : "${id}/${name}" => "/applications/${s.application}/federatedIdentityCredential/${credential}"
+      for name, credential in s.credentials : "${id}/${name}" => "${s.application}/federatedIdentityCredential/${credential}"
     }
   ]...)
   to = azuread_application_federated_identity_credential.this[each.key]
