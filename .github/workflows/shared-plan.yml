@@ -342,7 +342,8 @@ jobs:
         run: |
           marker="<!-- tofu-plan ${ROOT} ${KEY} -->"
           log=$RUNNER_TEMP/plan.txt; [ -f "$log" ] || log=$RUNNER_TEMP/plan.log
-          summary=$(grep -E '^(Plan: |No changes\.|Error: )' "$log" | head -1 || true)
+          # A failed plan can print "Plan:" before its error: the error comes first.
+          summary=$(grep -m1 '^Error: ' "$log" || grep -m1 -E '^(Plan: |No changes\.)' "$log" || true)
           title="Plan: \`$ROOT\`${KEY:+ \`$KEY\`}"
           [ "$MODE" = replan ] && title="Plan before apply: \`$ROOT\`${KEY:+ \`$KEY\`}"
           {
@@ -408,7 +409,7 @@ jobs:
             if [ -n "$number" ]; then gh issue close "$number" --comment "No drift in the [nightly run]($RUN_URL)."; fi
             exit 0
           fi
-          summary=$(grep -E '^(Plan: |Error: )' "$log" 2>/dev/null | head -1 || true)
+          summary=$(grep -m1 '^Error: ' "$log" 2>/dev/null || grep -m1 '^Plan: ' "$log" 2>/dev/null || true)
           {
             echo "\`$ROOT\`${KEY:+ \`$KEY\`} on \`main\` differs from the live state, or its plan failed, in the [nightly run]($RUN_URL)."
             echo
