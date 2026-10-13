@@ -1,6 +1,7 @@
 # The Trislab groups of 02-architecture.md section 6. The tenant owner adds
 # the members by hand; no member is written here. spn-platform-apply creates
-# them with Group.Create and owns them, which lets it manage them (ADR 0034).
+# them with Group.Create and owns them, which lets it manage them. It reads
+# them back, owners included, with Group.Read.All (ADR 0034).
 # grp-cust-<code>-admins come with the first customer in catalog/owners.yaml.
 
 locals {

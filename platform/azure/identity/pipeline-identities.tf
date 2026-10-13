@@ -42,7 +42,7 @@ locals {
     platform-apply = {
       workflow = "shared-apply.yml"
       trust    = { platform = "environment:platform" }
-      graph    = ["Application.ReadWrite.OwnedBy", "Group.Create"]
+      graph    = ["Application.ReadWrite.OwnedBy", "Group.Create", "Group.Read.All"]
     }
     global-plan = {
       workflow = "shared-plan.yml"
