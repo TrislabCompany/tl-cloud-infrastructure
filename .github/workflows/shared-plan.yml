@@ -253,6 +253,12 @@ jobs:
           ARM_USE_OIDC: "true"
           ARM_STORAGE_USE_AZUREAD: "true"
           TF_VAR_landing_zone: ${{ inputs.key }}
+          # Passed to every root; a root that doesn't declare one ignores it (08 section 2).
+          TF_VAR_platform_suffix: ${{ vars.PLATFORM_SUFFIX }}
+          TF_VAR_alert_email_platform: ${{ vars.ALERT_EMAIL_PLATFORM }}
+          TF_VAR_alert_email_finops: ${{ vars.ALERT_EMAIL_FINOPS }}
+          TF_VAR_github_owner_id: ${{ github.repository_owner_id }}
+          TF_VAR_github_repository_id: ${{ github.repository_id }}
           DESTROY: ${{ steps.dir.outputs.destroy }}
         run: |
           # Plans take no state lock: a plan identity can't write the lock blob (08 section 7).
