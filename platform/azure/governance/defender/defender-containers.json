@@ -1,0 +1,66 @@
+{
+  "builtin": "c9ddb292-b203-4738-aead-18e2716e858f",
+  "version": "1.0.1",
+  "displayName": "Configure Microsoft Defender for Containers to be enabled",
+  "mode": "All",
+  "parameters": {
+    "effect": {
+      "allowedValues": [
+        "DeployIfNotExists",
+        "Disabled"
+      ],
+      "defaultValue": "DeployIfNotExists",
+      "metadata": {
+        "description": "Enable or disable the execution of the policy",
+        "displayName": "Effect"
+      },
+      "type": "String"
+    }
+  },
+  "policyRule": {
+    "if": {
+      "equals": "Microsoft.Resources/subscriptions",
+      "field": "type"
+    },
+    "then": {
+      "details": {
+        "deployment": {
+          "location": "westeurope",
+          "properties": {
+            "mode": "incremental",
+            "parameters": {},
+            "template": {
+              "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+              "contentVersion": "1.0.0.0",
+              "outputs": {},
+              "parameters": {},
+              "resources": [
+                {
+                  "apiVersion": "2023-01-01",
+                  "name": "Containers",
+                  "properties": {
+                    "pricingTier": "Standard"
+                  },
+                  "type": "Microsoft.Security/pricings"
+                }
+              ],
+              "variables": {}
+            }
+          }
+        },
+        "deploymentScope": "subscription",
+        "existenceCondition": {
+          "equals": "Standard",
+          "field": "Microsoft.Security/pricings/pricingTier"
+        },
+        "existenceScope": "subscription",
+        "name": "Containers",
+        "roleDefinitionIds": [
+          "/providers/Microsoft.Authorization/roleDefinitions/fb1c8493-542b-48eb-b624-b4c8fea62acd"
+        ],
+        "type": "Microsoft.Security/pricings"
+      },
+      "effect": "[parameters('effect')]"
+    }
+  }
+}
