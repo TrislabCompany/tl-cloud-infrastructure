@@ -1,0 +1,11 @@
+# Prowler findings accepted for this root (08-pipeline.md section 3).
+exceptions:
+  - check: AZU-0012
+    resource: storage.tf
+    reason: >-
+      stplatformtfstate<nnnn> keeps its public endpoint open, because the
+      GitHub-hosted runners that plan and apply every root have no fixed
+      address. Only Entra ID sign-in is allowed (no shared key), each identity
+      reaches only its own container, and every state is encrypted
+      (08-pipeline.md section 7, ADR 0046).
+    expires: 2027-10-12
