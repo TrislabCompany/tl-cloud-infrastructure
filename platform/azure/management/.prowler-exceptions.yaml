@@ -1,0 +1,10 @@
+# Prowler findings accepted for this root (08-pipeline.md section 3).
+exceptions:
+  - check: AZU-0013
+    resource: key-vault.tf
+    reason: >-
+      kv-platform-<nnnn> keeps its public endpoint open, because the
+      GitHub-hosted runners that read the contacts-<code> secrets have no fixed
+      address. Only Entra ID sign-in is allowed, access is Azure RBAC per
+      secret, and purge protection is on (02-architecture.md section 6).
+    expires: 2027-10-13

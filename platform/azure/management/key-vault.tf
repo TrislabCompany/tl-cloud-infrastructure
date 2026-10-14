@@ -11,6 +11,8 @@ locals {
   grp_platform_admins = "ef49c472-4301-480b-a70e-19d6ca240357"
 }
 
+# Keeps its public endpoint, listed in .prowler-exceptions.yaml
+# (02-architecture.md section 6).
 resource "azurerm_key_vault" "platform" {
   name                       = "kv-platform-${var.platform_suffix}"
   resource_group_name        = azurerm_resource_group.management.name
