@@ -229,15 +229,14 @@ jobs:
             else
               check "$NEXT" "${SECRET}_NEXT"
               n=$(escape "$NEXT")
-              # The platform states written before aliases keep their salt under the provider's
-              # address, so this rotation's fallback has no alias (phase 3, step A7).
               cat <<EOF
           key_provider "pbkdf2" "next" {
             passphrase               = "$n"
             encrypted_metadata_alias = "$(key_alias "$NEXT")"
           }
           key_provider "pbkdf2" "layer" {
-            passphrase = "$p"
+            passphrase               = "$p"
+            encrypted_metadata_alias = "$(key_alias "$PASSPHRASE")"
           }
           method "aes_gcm" "next" {
             keys = key_provider.pbkdf2.next
