@@ -189,18 +189,30 @@ jobs:
 
       - name: Set the state and plan encryption
         env:
+          SECRET: ${{ needs.resolve.outputs.secret }}
           PASSPHRASE: ${{ secrets[needs.resolve.outputs.secret] }}
+          NEXT: ${{ secrets[format('{0}_NEXT', needs.resolve.outputs.secret)] }}
         run: |
           # ADR 0046: pbkdf2 key from the layer's passphrase, aes_gcm, enforced for state and plan.
-          if [ ${#PASSPHRASE} -lt 32 ] || [[ "$PASSPHRASE" == *$'\n'* ]]; then
-            echo "::error::${{ needs.resolve.outputs.secret }} is missing, shorter than 32 characters or has a line break"; exit 1
-          fi
-          p=${PASSPHRASE//\\/\\\\}; p=${p//\"/\\\"}; p=${p//\$\{/\$\$\{}; p=${p//%\{/%%\{}
+          # Each key's salt is stored in the state under an alias made from its passphrase, so a
+          # rotation's two keys never share a name (08 section 7, Encryption). While <secret>_NEXT
+          # exists, a rotation runs: encrypt with the next passphrase, and fall back to the current one.
+          check() {
+            if [ ${#1} -lt 32 ] || [[ "$1" == *$'\n'* ]]; then
+              echo "::error::$2 is missing, shorter than 32 characters or has a line break"; exit 1
+            fi
+          }
+          escape() { local p=${1//\\/\\\\}; p=${p//\"/\\\"}; p=${p//\$\{/\$\$\{}; printf '%s' "${p//%\{/%%\{}"; }
+          key_alias() { printf 'pbkdf2-%s' "$(printf '%s' "$1" | sha256sum | cut -c1-16)"; }
+          check "$PASSPHRASE" "$SECRET"
+          p=$(escape "$PASSPHRASE")
           {
             echo 'TF_ENCRYPTION<<TF_ENCRYPTION_END'
-            cat <<EOF
+            if [ -z "$NEXT" ]; then
+              cat <<EOF
           key_provider "pbkdf2" "layer" {
-            passphrase = "$p"
+            passphrase               = "$p"
+            encrypted_metadata_alias = "$(key_alias "$PASSPHRASE")"
           }
           method "aes_gcm" "layer" {
             keys = key_provider.pbkdf2.layer
@@ -214,6 +226,41 @@ jobs:
             enforced = true
           }
           EOF
+            else
+              check "$NEXT" "${SECRET}_NEXT"
+              n=$(escape "$NEXT")
+              # The platform states written before aliases keep their salt under the provider's
+              # address, so this rotation's fallback has no alias (phase 3, step A7).
+              cat <<EOF
+          key_provider "pbkdf2" "next" {
+            passphrase               = "$n"
+            encrypted_metadata_alias = "$(key_alias "$NEXT")"
+          }
+          key_provider "pbkdf2" "layer" {
+            passphrase = "$p"
+          }
+          method "aes_gcm" "next" {
+            keys = key_provider.pbkdf2.next
+          }
+          method "aes_gcm" "layer" {
+            keys = key_provider.pbkdf2.layer
+          }
+          state {
+            method   = method.aes_gcm.next
+            enforced = true
+            fallback {
+              method = method.aes_gcm.layer
+            }
+          }
+          plan {
+            method   = method.aes_gcm.next
+            enforced = true
+            fallback {
+              method = method.aes_gcm.layer
+            }
+          }
+          EOF
+            fi
             echo TF_ENCRYPTION_END
           } >> "$GITHUB_ENV"
 
