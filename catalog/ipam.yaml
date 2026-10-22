@@ -1,0 +1,15 @@
+# IP plan (07 sections 5 and 6), checked by policy/catalog.rego. A range is
+# reserved by being in this file. Each landing zone adds its range in its own
+# PR.
+pools:
+  hubs: 10.0.0.0/12               # Azure hubs from 10.0.0.0/13, GCP hubs from 10.8.0.0/13
+  prod: 10.16.0.0/12
+  sandbox: 10.32.0.0/12
+
+hubs:
+  - name: vnet-hub-neu
+    cloud: azure
+    region: northeurope
+    cidr: 10.0.0.0/20
+    subnets:
+      GatewaySubnet: 10.0.0.0/27
