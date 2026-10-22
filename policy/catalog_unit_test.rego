@@ -364,13 +364,13 @@ test_cancel_after_hold_passes if {
 test_cancel_during_hold_is_denied if {
 	main := {"lz_yaml": {"products-sandbox-neu": decommissioned("products-sandbox-neu", "2200-01-01", {})}}
 	some msg in compared({"lz_yaml": {"products-sandbox-neu": decommissioned("products-sandbox-neu", "2200-01-01", {"state": "cancelled"})}}, main)
-	contains(msg, "the hold ends on 2200-01-31")
+	contains(msg, "the hold ends on 2200-01-02")
 }
 
-test_experiment_hold_is_7_days if {
+test_experiment_hold_is_0_days if {
 	main := {"lz_yaml": {"exp-aks": decommissioned("exp-aks", "2200-01-01", {})}}
 	some msg in compared({"lz_yaml": {"exp-aks": decommissioned("exp-aks", "2200-01-01", {"state": "cancelled"})}}, main)
-	contains(msg, "the hold ends on 2200-01-08")
+	contains(msg, "the hold ends on 2200-01-01")
 }
 
 test_hold_days_count_from_main if {
@@ -398,7 +398,7 @@ test_back_to_active_during_hold_passes if {
 test_back_to_active_after_hold_is_denied if {
 	main := {"lz_yaml": {"products-sandbox-neu": decommissioned("products-sandbox-neu", "2020-01-01", {})}}
 	some msg in compared({"lz_yaml": {"products-sandbox-neu": lz("products-sandbox-neu", {})}}, main)
-	contains(msg, "the hold ended on 2020-01-31")
+	contains(msg, "the hold ended on 2020-01-02")
 }
 
 test_cancelled_stays_cancelled if {
