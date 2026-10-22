@@ -43,14 +43,6 @@ provider "azurerm" {
   resource_provider_registrations = "none"
 }
 
-# The landing zone's own subscription, for what goes into its resource groups.
-provider "azurerm" {
-  alias = "lz"
-  features {}
-  subscription_id                 = module.landing_zone.subscription_id
-  resource_provider_registrations = "none"
-}
-
 provider "azapi" {}
 
 provider "azuread" {}
