@@ -49,6 +49,18 @@ deny contains msg if {
 	msg := sprintf("%s: the tag %s is %q, not one of %v (03 section 9, catalog/owners.yaml)", [address, tag, tags[tag], sort(values)])
 }
 
+# dev, test, uat, perf, demo, staging, pr<n> and prod name a stamp's environment;
+# sandbox and experiment a landing zone's own resources (03 section 9).
+environment_names := {"dev", "test", "uat", "perf", "demo", "staging", "prod", "sandbox", "experiment"}
+
+deny contains msg if {
+	some [address, tags, _] in tagged
+	is_string(tags.EnvironmentName)
+	not tags.EnvironmentName in environment_names
+	not regex.match(`^pr[1-9][0-9]*$`, tags.EnvironmentName)
+	msg := sprintf("%s: the tag EnvironmentName is %q, not one of %v or pr<n> (03 section 9)", [address, tags.EnvironmentName, sort(environment_names)])
+}
+
 as_object(x) := x if is_object(x)
 
 as_object(x) := {} if not is_object(x)

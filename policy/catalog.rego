@@ -547,11 +547,15 @@ deny contains msg if {
 # ---- landing-zones/<lz>.yaml (05 section 3) ----
 #
 # Each file comes as data.<side>.lz_yaml["<lz>"]. The landing-zone module checks
-# the rest of the file on plan; these two rules need main.
+# the rest of the file on plan; these rules need the file name, main or today.
 
 default lz_yaml := {}
 
 lz_yaml := data.pr.lz_yaml
+
+default main_lz_yaml := {}
+
+main_lz_yaml := data.main.lz_yaml
 
 deny contains msg if {
 	some lz, y in lz_yaml
@@ -567,3 +571,84 @@ deny contains msg if {
 	not y.production_data == true
 	msg := sprintf("landing-zones/%s.yaml: production_data was true on main; it never goes back to false (05 section 2)", [lz])
 }
+
+deny contains msg if {
+	some lz, y in lz_yaml
+	y.name != lz
+	msg := sprintf("landing-zones/%s.yaml: name is %v; it must be the file name (05 section 2)", [lz, y.name])
+}
+
+# An experiment gets at most 90 days when its file is added, and is extended by
+# PR to at most 180 in total, which the module checks (ADR 0051).
+deny contains msg if {
+	some lz, y in lz_yaml
+	y.archetype == "experiment"
+	not data.main.lz_yaml[lz]
+	to_number(trim_suffix(y.ttl, "d")) > 90
+	msg := sprintf("landing-zones/%s.yaml: a new experiment's ttl is at most 90d (ADR 0051)", [lz])
+}
+
+deny contains msg if {
+	some lz, y in lz_yaml
+	"decommissioned_on" in object.keys(y)
+	not is_date(y.decommissioned_on)
+	msg := sprintf("landing-zones/%s.yaml: decommissioned_on must be a date, YYYY-MM-DD (05 section 2)", [lz])
+}
+
+# Section 7: active, then decommissioned, then cancelled. A landing zone is
+# cancelled only after its hold, and taken back to active only during it. The
+# hold is counted from main's file, so a PR can't shorten it.
+deny contains msg if {
+	some lz, y in lz_yaml
+	y.state == "cancelled"
+	not object.get(main_lz_yaml, [lz, "state"], "") in {"decommissioned", "cancelled"}
+	msg := sprintf("landing-zones/%s.yaml: state cancelled follows decommissioned on main (05 section 7)", [lz])
+}
+
+deny contains msg if {
+	some lz, y in lz_yaml
+	y.state == "cancelled"
+	m := data.main.lz_yaml[lz]
+	m.state == "decommissioned"
+	time.now_ns() < hold_end(lz, m)
+	msg := sprintf("landing-zones/%s.yaml: the hold ends on %s; it is cancelled after that (05 section 7)", [lz, date(hold_end(lz, m))])
+}
+
+deny contains msg if {
+	some lz, y in lz_yaml
+	y.state == "active"
+	m := data.main.lz_yaml[lz]
+	m.state == "decommissioned"
+	time.now_ns() >= hold_end(lz, m)
+	msg := sprintf("landing-zones/%s.yaml: the hold ended on %s, so it can't be active again (05 section 7)", [lz, date(hold_end(lz, m))])
+}
+
+deny contains msg if {
+	some lz, m in data.main.lz_yaml
+	m.state == "cancelled"
+	y := lz_yaml[lz]
+	y.state != "cancelled"
+	msg := sprintf("landing-zones/%s.yaml: it was cancelled on main and stays cancelled (05 section 7)", [lz])
+}
+
+is_date(s) if {
+	regex.match(`^[0-9]{4}-[0-9]{2}-[0-9]{2}$`, s)
+	time.parse_ns("2006-01-02", s)
+}
+
+# 30 days, 7 for an experiment, unless the file sets hold_days (05 section 2).
+hold_days(_, y) := y.hold_days
+
+hold_days(lz, y) := 7 if {
+	not y.hold_days
+	startswith(lz, "exp-")
+}
+
+hold_days(lz, y) := 30 if {
+	not y.hold_days
+	not startswith(lz, "exp-")
+}
+
+hold_end(lz, y) := time.add_date(time.parse_ns("2006-01-02", y.decommissioned_on), 0, 0, hold_days(lz, y))
+
+date(ns) := sprintf("%d-%02d-%02d", time.date(ns))
