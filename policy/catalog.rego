@@ -636,15 +636,15 @@ is_date(s) if {
 	time.parse_ns("2006-01-02", s)
 }
 
-# 30 days, 7 for an experiment, unless the file sets hold_days (05 section 2).
+# 1 day, 0 for an experiment, unless the file sets hold_days (05 section 2).
 hold_days(_, y) := y.hold_days
 
-hold_days(lz, y) := 7 if {
+hold_days(lz, y) := 0 if {
 	not y.hold_days
 	startswith(lz, "exp-")
 }
 
-hold_days(lz, y) := 30 if {
+hold_days(lz, y) := 1 if {
 	not y.hold_days
 	not startswith(lz, "exp-")
 }
