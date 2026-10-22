@@ -299,3 +299,33 @@ test_removed_repo_is_denied if {
 	some msg in compared(with_list("repos", [good.repos[0]]), {"repos": good.repos})
 	contains(msg, "construction was removed or renamed")
 }
+
+# ---- landing-zones/<lz>.yaml ----
+
+lz(name, extra) := object.union({"name": name, "state": "active"}, extra)
+
+test_production_data_in_prod_passes if {
+	count(compared({"lz_yaml": {"products-prod-neu": lz("products-prod-neu", {"production_data": true})}}, {})) == 0
+}
+
+test_production_data_in_sandbox_is_denied if {
+	some msg in denied({"lz_yaml": {"products-sandbox-neu": lz("products-sandbox-neu", {"production_data": false})}})
+	contains(msg, "landing-zones/products-sandbox-neu.yaml: production_data is set only in a prod landing zone")
+}
+
+test_production_data_stays_true_passes if {
+	y := {"cust-oc-prod-neu": lz("cust-oc-prod-neu", {"production_data": true})}
+	count(compared({"lz_yaml": y}, {"lz_yaml": y})) == 0
+}
+
+test_production_data_set_back_to_false_is_denied if {
+	pr := {"lz_yaml": {"cust-oc-prod-neu": lz("cust-oc-prod-neu", {"production_data": false})}}
+	some msg in compared(pr, {"lz_yaml": {"cust-oc-prod-neu": lz("cust-oc-prod-neu", {"production_data": true})}})
+	contains(msg, "production_data was true on main; it never goes back to false")
+}
+
+test_production_data_removed_is_denied if {
+	pr := {"lz_yaml": {"cust-oc-prod-neu": lz("cust-oc-prod-neu", {})}}
+	some msg in compared(pr, {"lz_yaml": {"cust-oc-prod-neu": lz("cust-oc-prod-neu", {"production_data": true})}})
+	contains(msg, "production_data was true on main; it never goes back to false")
+}
