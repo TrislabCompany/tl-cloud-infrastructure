@@ -120,3 +120,83 @@ resource "azurerm_role_assignment" "seed_state" {
   role_definition_name = each.value.role
   principal_id         = each.value.principal
 }
+
+# ---- State rights of the global and landingzones layers ---------------------
+# 08-pipeline.md section 7, ADR 0032. The identities come from
+# platform/azure/identity, read through spn-platform-plan's
+# Application.Read.All (ADR 0034).
+
+data "azuread_service_principal" "layer" {
+  for_each     = toset(["global-plan", "global-apply", "landingzones-plan", "landingzones-apply"])
+  display_name = "spn-${each.key}"
+}
+
+locals {
+  # Built-in role IDs, the same in every tenant.
+  blob_reader_id      = "2a2b9908-6ea1-4ae2-8e65-a410df84e7d1" # Storage Blob Data Reader
+  blob_contributor_id = "ba92f5b4-2d11-453d-a403-e96b0029c9fe" # Storage Blob Data Contributor
+
+  layer_state_rights = {
+    global-plan        = { container = "tfstate-global", role = "Storage Blob Data Reader" }
+    global-apply       = { container = "tfstate-global", role = "Storage Blob Data Contributor" }
+    landingzones-plan  = { container = "tfstate-lz", role = "Storage Blob Data Reader" }
+    landingzones-apply = { container = "tfstate-lz", role = "Storage Blob Data Contributor" }
+  }
+
+  # spn-landingzones-apply may write and delete only role assignments of the
+  # two blob roles, to service principals: the landing-zone module grants each
+  # landing zone's identities their path on tfstate-stamps, and offboarding
+  # deletes them (ADR 0032, technical details).
+  stamps_grant_condition = trimspace(<<-EOT
+    (
+     (
+      !(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})
+     )
+     OR
+     (
+      @Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${local.blob_reader_id}, ${local.blob_contributor_id}}
+      AND
+      @Request[Microsoft.Authorization/roleAssignments:PrincipalType] ForAnyOfAnyValues:StringEqualsIgnoreCase {'ServicePrincipal'}
+     )
+    )
+    AND
+    (
+     (
+      !(ActionMatches{'Microsoft.Authorization/roleAssignments/delete'})
+     )
+     OR
+     (
+      @Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${local.blob_reader_id}, ${local.blob_contributor_id}}
+      AND
+      @Resource[Microsoft.Authorization/roleAssignments:PrincipalType] ForAnyOfAnyValues:StringEqualsIgnoreCase {'ServicePrincipal'}
+     )
+    )
+  EOT
+  )
+}
+
+resource "azurerm_role_assignment" "layer_state" {
+  for_each             = local.layer_state_rights
+  scope                = azurerm_storage_container.state[each.value.container].id
+  role_definition_name = each.value.role
+  principal_id         = data.azuread_service_principal.layer[each.key].object_id
+  principal_type       = "ServicePrincipal"
+}
+
+resource "azurerm_role_assignment" "stamps_grant" {
+  scope                = azurerm_storage_container.state["tfstate-stamps"].id
+  role_definition_name = "Role Based Access Control Administrator"
+  principal_id         = data.azuread_service_principal.layer["landingzones-apply"].object_id
+  principal_type       = "ServicePrincipal"
+  condition            = local.stamps_grant_condition
+  condition_version    = "2.0"
+}
+
+# A landing zone plan refreshes the role assignments the landing-zone module
+# makes on tfstate-stamps. Reader holds no data action, so it opens no blob.
+resource "azurerm_role_assignment" "stamps_reader" {
+  scope                = azurerm_storage_container.state["tfstate-stamps"].id
+  role_definition_name = "Reader"
+  principal_id         = data.azuread_service_principal.layer["landingzones-plan"].object_id
+  principal_type       = "ServicePrincipal"
+}
