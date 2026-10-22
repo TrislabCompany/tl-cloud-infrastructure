@@ -180,7 +180,8 @@ jobs:
         run: |
           # tofu init writes an empty state when there is none, which a plan identity
           # can't do. The first /apply creates it, and the next /apply plans and
-          # applies the root (08 section 7).
+          # applies the root. Until then a PR plans it against an empty local state,
+          # for review and its cost only (08 section 7).
           exists=$(az storage blob exists --auth-mode login --account-name "$STATE_ACCOUNT" \
             --container-name "$CONTAINER" --name "$STATE_KEY" --query exists -o tsv)
           if [ "$exists" = true ] || [ "$MODE" = drift ]; then echo "new=false" >> "$GITHUB_OUTPUT"; exit 0; fi
@@ -272,29 +273,40 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: tofu init
-        if: steps.identity.outputs.skip != 'true' && steps.state.outputs.new != 'true'
+        if: steps.identity.outputs.skip != 'true' && (steps.state.outputs.new != 'true' || steps.layer.outputs.mode == 'pr')
         env:
           ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
           ARM_USE_OIDC: "true"
           ARM_STORAGE_USE_AZUREAD: "true"
-        run: >-
-          tofu -chdir="${{ steps.dir.outputs.path }}" init -input=false -no-color -lockfile=readonly
-          -backend-config="storage_account_name=$STATE_ACCOUNT"
-          -backend-config="container_name=${{ steps.layer.outputs.container }}"
-          -backend-config="key=${{ steps.layer.outputs.state_key }}"
-          -backend-config="use_azuread_auth=true"
+          NEW: ${{ steps.state.outputs.new }}
+          DIR: ${{ steps.dir.outputs.path }}
+          CONTAINER: ${{ steps.layer.outputs.container }}
+          STATE_KEY: ${{ steps.layer.outputs.state_key }}
+        run: |
+          if [ "$NEW" = true ]; then
+            # A new root's PR plan: an empty local state, never written to Azure.
+            # The plan is not uploaded, so it is never applied (08 section 7).
+            printf 'terraform {\n  backend "local" {}\n}\n' > "$DIR/zz_new_root_override.tf"
+            tofu -chdir="$DIR" init -input=false -no-color -lockfile=readonly
+            exit 0
+          fi
+          tofu -chdir="$DIR" init -input=false -no-color -lockfile=readonly \
+            -backend-config="storage_account_name=$STATE_ACCOUNT" \
+            -backend-config="container_name=$CONTAINER" \
+            -backend-config="key=$STATE_KEY" \
+            -backend-config="use_azuread_auth=true"
 
       - name: tofu fmt
-        if: steps.identity.outputs.skip != 'true' && steps.state.outputs.new != 'true' && steps.layer.outputs.mode == 'pr' && steps.dir.outputs.destroy != 'true'
+        if: steps.identity.outputs.skip != 'true' && steps.layer.outputs.mode == 'pr' && steps.dir.outputs.destroy != 'true'
         run: tofu -chdir="${{ steps.dir.outputs.path }}" fmt -check -diff -no-color
 
       - name: tofu validate
-        if: steps.identity.outputs.skip != 'true' && steps.state.outputs.new != 'true'
+        if: steps.identity.outputs.skip != 'true' && (steps.state.outputs.new != 'true' || steps.layer.outputs.mode == 'pr')
         run: tofu -chdir="${{ steps.dir.outputs.path }}" validate -no-color
 
       - name: tofu plan
         id: plan
-        if: steps.identity.outputs.skip != 'true' && steps.state.outputs.new != 'true'
+        if: steps.identity.outputs.skip != 'true' && (steps.state.outputs.new != 'true' || steps.layer.outputs.mode == 'pr')
         env:
           ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
           ARM_USE_OIDC: "true"
@@ -357,24 +369,27 @@ jobs:
           cat "$RUNNER_TEMP/conftest.txt"
           exit $code
 
+      # Also after a conftest failure, and before an apply: the cost is always in
+      # the plan comment (08 section 3).
       - name: Set up Infracost
-        if: steps.layer.outputs.mode == 'pr' && steps.plan.outcome == 'success'
+        if: ${{ !cancelled() && steps.layer.outputs.mode != 'drift' && steps.plan.outcome == 'success' }}
         uses: infracost/actions/setup@fb736a8f219195d6efdca58682069b16fe1bc280 # v4.2.0
         with:
           api-key: ${{ secrets.INFRACOST_API_KEY }}
           version: ${{ env.INFRACOST_VERSION }}
 
       - name: Infracost
-        if: steps.layer.outputs.mode == 'pr' && steps.plan.outcome == 'success'
+        if: ${{ !cancelled() && steps.layer.outputs.mode != 'drift' && steps.plan.outcome == 'success' }}
         continue-on-error: true
         run: |
           # Never fails the PR: posts the monthly cost change (08 section 3).
+          [ -f "$RUNNER_TEMP/plan.json" ] || tofu -chdir="${{ steps.dir.outputs.path }}" show -json tfplan > "$RUNNER_TEMP/plan.json"
           infracost diff --path "$RUNNER_TEMP/plan.json" --no-color > "$RUNNER_TEMP/cost.txt" 2>&1 \
             || echo "Infracost could not price this plan." >> "$RUNNER_TEMP/cost.txt"
           cat "$RUNNER_TEMP/cost.txt"
 
       - name: Upload the saved plan
-        if: steps.layer.outputs.mode != 'drift' && steps.plan.outcome == 'success'
+        if: steps.layer.outputs.mode != 'drift' && steps.plan.outcome == 'success' && steps.state.outputs.new != 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           # Encrypted with the layer's passphrase (ADR 0046). Named after the commit, so
@@ -411,12 +426,14 @@ jobs:
             echo "$marker"
             echo "### $title"
             echo
-            if [ "$NEW" = true ]; then
+            if [ "$NEW" = true ] && [ "$MODE" != pr ]; then
               echo "**New root: its state doesn't exist yet, so it isn't planned.** Commit ${SHA:0:7}, [run]($RUN_URL)."
-              echo
-              echo "The first \`/apply\`, once approved in \`$ENVIRONMENT\`, only creates the empty state. The next \`/apply\` plans the root, runs the checks and applies it after a second approval (08 section 7)."
             else
               echo "**${summary:-The plan failed.}** Commit ${SHA:0:7}, [run]($RUN_URL)."
+              if [ "$NEW" = true ]; then
+                echo
+                echo "New root: planned against an empty state, for review only. The first \`/apply\`, once approved in \`$ENVIRONMENT\`, only creates the state. The next \`/apply\` plans the root again, runs the checks and applies it after a second approval (08 section 7)."
+              fi
               [ "$DESTROY" = true ] && echo && echo "The root is deleted by this PR, so this is a destroy plan from \`main\`'s copy."
               echo
               echo "<details><summary>Full plan</summary>"
@@ -431,12 +448,14 @@ jobs:
                 echo; echo '```text'; head -c 5000 "$RUNNER_TEMP/conftest.txt"; echo '```'
               fi
             fi
-            if [ "$MODE" = pr ] && [ "$NEW" != true ]; then
+            if [ "$PLAN_OUTCOME" = success ] || [ "$PLAN_OUTCOME" = failure ]; then
               echo
               echo "**Infracost** (monthly cost change)"
               echo
               echo '```text'
-              if [ -f "$RUNNER_TEMP/cost.txt" ]; then head -c 8000 "$RUNNER_TEMP/cost.txt"; else echo "Not run: the plan failed."; fi
+              if [ -f "$RUNNER_TEMP/cost.txt" ]; then head -c 8000 "$RUNNER_TEMP/cost.txt"
+              elif [ "$PLAN_OUTCOME" = failure ]; then echo "Not run: the plan failed."
+              else echo "Not run: see the run."; fi
               echo '```'
             fi
           } > "$RUNNER_TEMP/comment.md"
