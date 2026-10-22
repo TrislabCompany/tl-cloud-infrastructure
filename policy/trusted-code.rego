@@ -18,12 +18,13 @@ allowed_sources := {
 	"hashicorp/google", "kislerdm/neon", "upstash/upstash",
 }
 
-# Module sources: a local path, or the tl-platform repository and nothing
-# that only starts with its name.
+# Module sources: a local path, or a folder of the tl-platform repository at a
+# release tag and nothing else. Its v* tags can't be moved (09 section 8), so a
+# tag always means the same reviewed code; a branch or a missing ref doesn't.
 allowed_module_patterns := [
 	`^\.\.?/`,
-	`^git::https://github\.com/TrislabCompany/tl-platform\.git(//|\?|$)`,
-	`^github\.com/TrislabCompany/tl-platform(\.git)?(//|\?|$)`,
+	`^git::https://github\.com/TrislabCompany/tl-platform\.git//[A-Za-z0-9._/-]+\?ref=v[0-9]+\.[0-9]+\.[0-9]+$`,
+	`^github\.com/TrislabCompany/tl-platform(\.git)?//[A-Za-z0-9._/-]+\?ref=v[0-9]+\.[0-9]+\.[0-9]+$`,
 ]
 
 deny contains msg if {
@@ -72,7 +73,7 @@ deny contains msg if {
 	some name, blocks in input.module
 	some block in blocks
 	not allowed_module_source(block.source)
-	msg := sprintf("module %q has a source other than tl-platform or a local path: %v", [name, block.source])
+	msg := sprintf("module %q has a source other than a tl-platform release tag or a local path: %v", [name, block.source])
 }
 
 allowed_source(spec) if {
