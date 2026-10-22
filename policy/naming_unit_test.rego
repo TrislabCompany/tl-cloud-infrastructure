@@ -40,6 +40,8 @@ test_good_names_pass if {
 		["azurerm_resource_group", "rg-shr-con-prod-01"],
 		["azurerm_virtual_network", "vnet-hub-neu"],
 		["azurerm_virtual_network", "vnet-cust-asg-sandbox-neu"],
+		["azurerm_network_watcher", "nw-hub-neu"],
+		["azurerm_network_watcher", "nw-cust-oc-sandbox-neu"],
 		["azurerm_subnet", "GatewaySubnet"],
 		["azurerm_subnet", "snet-oc-con-pr142"],
 		["azurerm_key_vault", "kv-platform-1307"],
