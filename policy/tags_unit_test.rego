@@ -74,3 +74,14 @@ test_entra_tags_are_not_checked if {
 	p := plan("azuread_application", ["create"], {"tags": ["x"]}, {})
 	count(deny) == 0 with input as p with data.pr as catalog
 }
+
+test_environment_name_values_pass if {
+	every name in ["dev", "pr7", "sandbox", "experiment"] {
+		count(denied({"tags": object.union(good_tags, {"EnvironmentName": name})})) == 0
+	}
+}
+
+test_unknown_environment_name_is_denied if {
+	some msg in denied({"tags": object.union(good_tags, {"EnvironmentName": "production"})})
+	contains(msg, `the tag EnvironmentName is "production"`)
+}

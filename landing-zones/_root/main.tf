@@ -8,7 +8,7 @@ locals {
 }
 
 module "landing_zone" {
-  source = "git::https://github.com/TrislabCompany/tl-platform.git//landing-zone?ref=v0.1.0"
+  source = "git::https://github.com/TrislabCompany/tl-platform.git//landing-zone?ref=v0.2.0"
 
   providers = {
     azurerm    = azurerm
