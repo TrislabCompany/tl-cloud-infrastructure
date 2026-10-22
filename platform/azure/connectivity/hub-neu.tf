@@ -51,6 +51,15 @@ resource "azurerm_virtual_network" "hub_neu" {
   }
 }
 
+# Azure creates NetworkWatcherRG without the mandatory tags when a region has no
+# watcher, and the tag deny refuses it (ADR 0022). One watcher per region.
+resource "azurerm_network_watcher" "hub_neu" {
+  name                = "nw-hub-neu"
+  resource_group_name = azurerm_resource_group.hub_neu.name
+  location            = azurerm_resource_group.hub_neu.location
+  tags                = local.tags
+}
+
 resource "azurerm_subnet" "gateway_neu" {
   name                 = "GatewaySubnet"
   resource_group_name  = azurerm_resource_group.hub_neu.name
