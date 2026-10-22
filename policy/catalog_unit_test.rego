@@ -329,3 +329,80 @@ test_production_data_removed_is_denied if {
 	some msg in compared(pr, {"lz_yaml": {"cust-oc-prod-neu": lz("cust-oc-prod-neu", {"production_data": true})}})
 	contains(msg, "production_data was true on main; it never goes back to false")
 }
+
+test_name_not_file_name_is_denied if {
+	some msg in denied({"lz_yaml": {"products-sandbox-neu": lz("products-prod-neu", {})}})
+	contains(msg, "landing-zones/products-sandbox-neu.yaml: name is products-prod-neu; it must be the file name")
+}
+
+test_new_experiment_ttl_90_passes if {
+	count(compared({"lz_yaml": {"exp-aks": lz("exp-aks", {"archetype": "experiment", "ttl": "90d"})}}, {})) == 0
+}
+
+test_new_experiment_ttl_over_90_is_denied if {
+	some msg in compared({"lz_yaml": {"exp-aks": lz("exp-aks", {"archetype": "experiment", "ttl": "91d"})}}, {})
+	contains(msg, "a new experiment's ttl is at most 90d")
+}
+
+test_extended_experiment_ttl_passes if {
+	main := {"lz_yaml": {"exp-aks": lz("exp-aks", {"archetype": "experiment", "ttl": "90d"})}}
+	count(compared({"lz_yaml": {"exp-aks": lz("exp-aks", {"archetype": "experiment", "ttl": "150d"})}}, main)) == 0
+}
+
+test_decommissioned_on_not_a_date_is_denied if {
+	some msg in denied({"lz_yaml": {"exp-aks": lz("exp-aks", {"state": "decommissioned", "decommissioned_on": "1.11.2026"})}})
+	contains(msg, "decommissioned_on must be a date")
+}
+
+decommissioned(name, on, extra) := lz(name, object.union({"state": "decommissioned", "decommissioned_on": on}, extra))
+
+test_cancel_after_hold_passes if {
+	main := {"lz_yaml": {"exp-aks": decommissioned("exp-aks", "2020-01-01", {})}}
+	count(compared({"lz_yaml": {"exp-aks": decommissioned("exp-aks", "2020-01-01", {"state": "cancelled"})}}, main)) == 0
+}
+
+test_cancel_during_hold_is_denied if {
+	main := {"lz_yaml": {"products-sandbox-neu": decommissioned("products-sandbox-neu", "2200-01-01", {})}}
+	some msg in compared({"lz_yaml": {"products-sandbox-neu": decommissioned("products-sandbox-neu", "2200-01-01", {"state": "cancelled"})}}, main)
+	contains(msg, "the hold ends on 2200-01-31")
+}
+
+test_experiment_hold_is_7_days if {
+	main := {"lz_yaml": {"exp-aks": decommissioned("exp-aks", "2200-01-01", {})}}
+	some msg in compared({"lz_yaml": {"exp-aks": decommissioned("exp-aks", "2200-01-01", {"state": "cancelled"})}}, main)
+	contains(msg, "the hold ends on 2200-01-08")
+}
+
+test_hold_days_count_from_main if {
+	main := {"lz_yaml": {"exp-aks": decommissioned("exp-aks", "2200-01-01", {"hold_days": 3})}}
+	some msg in compared({"lz_yaml": {"exp-aks": decommissioned("exp-aks", "2200-01-01", {"state": "cancelled", "hold_days": 0})}}, main)
+	contains(msg, "the hold ends on 2200-01-04")
+}
+
+test_cancel_from_active_is_denied if {
+	main := {"lz_yaml": {"exp-aks": lz("exp-aks", {})}}
+	some msg in compared({"lz_yaml": {"exp-aks": decommissioned("exp-aks", "2020-01-01", {"state": "cancelled"})}}, main)
+	contains(msg, "state cancelled follows decommissioned on main")
+}
+
+test_new_file_cancelled_is_denied if {
+	some msg in compared({"lz_yaml": {"exp-aks": decommissioned("exp-aks", "2020-01-01", {"state": "cancelled"})}}, {})
+	contains(msg, "state cancelled follows decommissioned on main")
+}
+
+test_back_to_active_during_hold_passes if {
+	main := {"lz_yaml": {"products-sandbox-neu": decommissioned("products-sandbox-neu", "2200-01-01", {})}}
+	count(compared({"lz_yaml": {"products-sandbox-neu": lz("products-sandbox-neu", {})}}, main)) == 0
+}
+
+test_back_to_active_after_hold_is_denied if {
+	main := {"lz_yaml": {"products-sandbox-neu": decommissioned("products-sandbox-neu", "2020-01-01", {})}}
+	some msg in compared({"lz_yaml": {"products-sandbox-neu": lz("products-sandbox-neu", {})}}, main)
+	contains(msg, "the hold ended on 2020-01-31")
+}
+
+test_cancelled_stays_cancelled if {
+	main := {"lz_yaml": {"exp-aks": decommissioned("exp-aks", "2020-01-01", {"state": "cancelled"})}}
+	some msg in compared({"lz_yaml": {"exp-aks": decommissioned("exp-aks", "2020-01-01", {})}}, main)
+	contains(msg, "it was cancelled on main and stays cancelled")
+}
