@@ -13,3 +13,7 @@ hubs:
     cidr: 10.0.0.0/20
     subnets:
       GatewaySubnet: 10.0.0.0/27
+
+landing_zones:
+  - name: products-sandbox-neu
+    cidr: 10.32.0.0/20
