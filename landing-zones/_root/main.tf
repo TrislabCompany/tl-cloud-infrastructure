@@ -8,12 +8,7 @@ locals {
 }
 
 module "landing_zone" {
-  source = "git::https://github.com/TrislabCompany/tl-platform.git//landing-zone?ref=v0.2.0"
-
-  providers = {
-    azurerm    = azurerm
-    azurerm.lz = azurerm.lz
-  }
+  source = "git::https://github.com/TrislabCompany/tl-platform.git//landing-zone?ref=v0.3.0"
 
   lz = yamldecode(file("${path.module}/../${var.landing_zone}.yaml"))
   catalog = {
@@ -27,6 +22,10 @@ module "landing_zone" {
   github_repository_id = var.github_repository_id
   az_billing_account   = var.az_billing_account
   az_billing_profile   = var.az_billing_profile
+
+  # The GitHub team devops, the reviewers of lz-<lz>. The GitHub Apps can't
+  # read teams, so the ID is written here (ADR 0019, ADR 0031).
+  devops_team_id = "19828806"
 
   # is-platform was made by hand, so its ID isn't its name (ADR 0011).
   az_platform_invoice_section = "FLNE-ZNPI-PJA-PGB"
