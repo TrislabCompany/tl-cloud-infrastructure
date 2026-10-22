@@ -39,7 +39,7 @@ patterns := {
 	"azurerm_virtual_network": ["vnet-hub-{region}", "vnet-{lz}"],
 	"azurerm_subnet": ["GatewaySubnet", "snet-{stamp}"],
 	"azurerm_network_security_group": ["nsg-{stamp}"],
-	"azurerm_network_watcher": ["nw-{lz}"],
+	"azurerm_network_watcher": ["nw-hub-{region}", "nw-{lz}"],
 	"azurerm_public_ip": ["pip-vgw-hub-{region}"],
 	"azurerm_virtual_network_gateway": ["vgw-hub-{region}"],
 	"azurerm_virtual_network_gateway_connection": ["conn-hub-{region}-to-gcp"],
