@@ -263,6 +263,16 @@ jobs:
             echo TF_ENCRYPTION_END
           } >> "$GITHUB_ENV"
 
+      - name: Sign in as tl-landingzones-apply
+        id: app
+        # The github provider of landing-zones/_root writes the lz-<lz> Environments (ADR 0019).
+        if: inputs.root == 'landing-zones/_root'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.LZ_APP_ID }}
+          private-key: ${{ secrets.LZ_APP_KEY }}
+          repositories: ${{ github.event.repository.name }}
+
       - name: Set the Azure environment
         env:
           CLIENT_ID: ${{ vars[needs.resolve.outputs.client_var] }}
@@ -274,6 +284,8 @@ jobs:
           ALERT_EMAIL_FINOPS: ${{ vars.ALERT_EMAIL_FINOPS }}
           OWNER_ID: ${{ github.repository_owner_id }}
           REPOSITORY_ID: ${{ github.repository_id }}
+          AZ_BILLING_ACCOUNT: ${{ vars.AZ_BILLING_ACCOUNT }}
+          AZ_BILLING_PROFILE: ${{ vars.AZ_BILLING_PROFILE }}
         run: |
           {
             echo "ARM_CLIENT_ID=$CLIENT_ID"; echo "ARM_SUBSCRIPTION_ID=$SUBSCRIPTION_ID"; echo "ARM_TENANT_ID=$TENANT_ID"
@@ -281,6 +293,7 @@ jobs:
             echo "TF_VAR_platform_suffix=$PLATFORM_SUFFIX"
             echo "TF_VAR_alert_email_platform=$ALERT_EMAIL_PLATFORM"; echo "TF_VAR_alert_email_finops=$ALERT_EMAIL_FINOPS"
             echo "TF_VAR_github_owner_id=$OWNER_ID"; echo "TF_VAR_github_repository_id=$REPOSITORY_ID"
+            echo "TF_VAR_az_billing_account=$AZ_BILLING_ACCOUNT"; echo "TF_VAR_az_billing_profile=$AZ_BILLING_PROFILE"
           } >> "$GITHUB_ENV"
 
       - name: Find the saved plan or a new root
@@ -314,6 +327,12 @@ jobs:
           exit 1
 
       - name: tofu apply
+        env:
+          # landing-zones/_root only: the github provider's token, and the ephemeral GHCR pull
+          # token it copies into each lz-<lz>, given again at apply (ADR 0019, ADR 0026).
+          GITHUB_TOKEN: ${{ steps.app.outputs.token }}
+          GITHUB_OWNER: ${{ inputs.root == 'landing-zones/_root' && github.repository_owner || '' }}
+          TF_VAR_ghcr_pull_token: ${{ inputs.root == 'landing-zones/_root' && secrets.GHCR_PULL_TOKEN || '' }}
         run: |
           set +e
           tofu -chdir="${{ steps.dir.outputs.path }}" apply -input=false -no-color "$RUNNER_TEMP/plan/tfplan" 2>&1 | tee "$RUNNER_TEMP/apply.log"
@@ -328,6 +347,10 @@ jobs:
 
       - name: Check that nothing is left to apply
         env:
+          # As in tofu apply.
+          GITHUB_TOKEN: ${{ steps.app.outputs.token }}
+          GITHUB_OWNER: ${{ inputs.root == 'landing-zones/_root' && github.repository_owner || '' }}
+          TF_VAR_ghcr_pull_token: ${{ inputs.root == 'landing-zones/_root' && secrets.GHCR_PULL_TOKEN || '' }}
           DESTROY: ${{ steps.dir.outputs.destroy }}
         run: |
           # `applied` is green only when a final plan of each root shows no changes (08 section 4).

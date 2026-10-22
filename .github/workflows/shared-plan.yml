@@ -121,7 +121,8 @@ jobs:
 
       - name: Sign in as tl-landingzones-plan
         id: app
-        if: steps.layer.outputs.layer == 'stamps'
+        # Stamps read lz-<lz> with it; landing-zones/_root's github provider reads the Environments (ADR 0019).
+        if: steps.layer.outputs.layer == 'stamps' || steps.layer.outputs.layer == 'landingzones'
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ vars.LZ_PLAN_APP_ID }}
@@ -305,6 +306,12 @@ jobs:
           TF_VAR_alert_email_finops: ${{ vars.ALERT_EMAIL_FINOPS }}
           TF_VAR_github_owner_id: ${{ github.repository_owner_id }}
           TF_VAR_github_repository_id: ${{ github.repository_id }}
+          TF_VAR_az_billing_account: ${{ vars.AZ_BILLING_ACCOUNT }}
+          TF_VAR_az_billing_profile: ${{ vars.AZ_BILLING_PROFILE }}
+          # The github provider of landing-zones/_root, read-only on plan. Plans get no
+          # GHCR pull token (ADR 0026).
+          GITHUB_TOKEN: ${{ steps.layer.outputs.layer == 'landingzones' && steps.app.outputs.token || '' }}
+          GITHUB_OWNER: ${{ steps.layer.outputs.layer == 'landingzones' && github.repository_owner || '' }}
           DESTROY: ${{ steps.dir.outputs.destroy }}
         run: |
           # Plans take no state lock: a plan identity can't write the lock blob (08 section 7).
@@ -326,13 +333,20 @@ jobs:
         working-directory: ${{ steps.dir.outputs.path }}
         run: |
           # main's rules, with the PR's catalog/ as data.pr and main's as data.main,
-          # so the rules can compare the two (08 section 3, Checks on every plan).
+          # so the rules can compare the two, and each landing-zones/<lz>.yaml as
+          # data.<side>.lz_yaml["<lz>"] (08 section 3, Checks on every plan).
           tofu show -json tfplan > "$RUNNER_TEMP/plan.json"
           mkdir -p "$RUNNER_TEMP/catalog"
           for side in pr:src main:main; do
             for f in "$GITHUB_WORKSPACE/${side#*:}/catalog/"*.yaml; do
               [ -e "$f" ] || continue
               yq -o=json "{\"${side%%:*}\": .}" "$f" > "$RUNNER_TEMP/catalog/${side%%:*}-$(basename "$f" .yaml).json"
+            done
+            for f in "$GITHUB_WORKSPACE/${side#*:}/landing-zones/"*.yaml; do
+              [ -e "$f" ] || continue
+              lz=$(basename "$f" .yaml)
+              [[ "$lz" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || { echo "::error::landing-zones/$lz.yaml is not a landing zone name"; exit 1; }
+              yq -o=json "{\"${side%%:*}\": {\"lz_yaml\": {\"$lz\": .}}}" "$f" > "$RUNNER_TEMP/catalog/${side%%:*}-lz-$lz.json"
             done
           done
           set +e
