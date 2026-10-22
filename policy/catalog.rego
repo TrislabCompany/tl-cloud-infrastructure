@@ -543,3 +543,27 @@ deny contains msg if {
 	not m.name in {r.name | some r in repos}
 	msg := sprintf("catalog/repos.yaml: %v was removed or renamed; a repository is archived with state: archived, never deleted (07 section 11)", [m.name])
 }
+
+# ---- landing-zones/<lz>.yaml (05 section 3) ----
+#
+# Each file comes as data.<side>.lz_yaml["<lz>"]. The landing-zone module checks
+# the rest of the file on plan; these two rules need main.
+
+default lz_yaml := {}
+
+lz_yaml := data.pr.lz_yaml
+
+deny contains msg if {
+	some lz, y in lz_yaml
+	"production_data" in object.keys(y)
+	not contains(lz, "-prod-")
+	msg := sprintf("landing-zones/%s.yaml: production_data is set only in a prod landing zone (05 section 2)", [lz])
+}
+
+deny contains msg if {
+	some lz, m in data.main.lz_yaml
+	m.production_data == true
+	y := lz_yaml[lz]
+	not y.production_data == true
+	msg := sprintf("landing-zones/%s.yaml: production_data was true on main; it never goes back to false (05 section 2)", [lz])
+}
