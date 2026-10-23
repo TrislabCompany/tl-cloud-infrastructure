@@ -611,7 +611,18 @@ deny contains msg if {
 	some lz, y in lz_yaml
 	y.state == "cancelled"
 	not object.get(main_lz_yaml, [lz, "state"], "") in {"decommissioned", "cancelled"}
-	msg := sprintf("landing-zones/%s.yaml: state cancelled follows decommissioned on main (05 section 7)", [lz])
+	not cancelled_without_hold(lz, y)
+	msg := sprintf("landing-zones/%s.yaml: state cancelled follows decommissioned on main, or active with hold_days: 0 outside an experiment (05 section 7)", [lz])
+}
+
+# Outside an experiment, hold_days: 0 takes an active landing zone straight to
+# cancelled in one PR. An experiment's cancel would run in the same apply as
+# its move to mg-decommissioned (05 section 7).
+cancelled_without_hold(lz, y) if {
+	object.get(main_lz_yaml, [lz, "state"], "") == "active"
+	not startswith(lz, "exp-")
+	y.hold_days == 0
+	"decommissioned_on" in object.keys(y)
 }
 
 deny contains msg if {
