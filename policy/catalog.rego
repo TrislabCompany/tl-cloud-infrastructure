@@ -578,6 +578,15 @@ deny contains msg if {
 	msg := sprintf("landing-zones/%s.yaml: name is %v; it must be the file name (05 section 2)", [lz, y.name])
 }
 
+# A landing zone peers with the hub of its region, so the hub is in
+# catalog/ipam.yaml first (05 section 5). An experiment has no region.
+deny contains msg if {
+	some lz, y in lz_yaml
+	is_string(y.region)
+	not y.region in {h.region | some h in hubs; h.cloud == y.cloud}
+	msg := sprintf("landing-zones/%s.yaml: there is no %v hub in %v in catalog/ipam.yaml; the hub is built first (05 section 5)", [lz, y.cloud, y.region])
+}
+
 # An experiment gets at most 90 days when its file is added, and is extended by
 # PR to at most 180 in total, which the module checks (ADR 0051).
 deny contains msg if {
