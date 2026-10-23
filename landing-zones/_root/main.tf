@@ -8,7 +8,7 @@ locals {
 }
 
 module "landing_zone" {
-  source = "git::https://github.com/TrislabCompany/tl-platform.git//landing-zone?ref=v0.3.0"
+  source = "git::https://github.com/TrislabCompany/tl-platform.git//landing-zone?ref=v0.4.0"
 
   lz = yamldecode(file("${path.module}/../${var.landing_zone}.yaml"))
   catalog = {

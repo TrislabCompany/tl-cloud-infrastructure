@@ -397,6 +397,23 @@ test_cancel_from_active_is_denied if {
 	contains(msg, "state cancelled follows decommissioned on main")
 }
 
+test_cancel_from_active_with_hold_days_0_passes if {
+	main := {"lz_yaml": {"products-sandbox-neu": lz("products-sandbox-neu", {})}}
+	count(compared({"lz_yaml": {"products-sandbox-neu": decommissioned("products-sandbox-neu", "2200-01-01", {"state": "cancelled", "hold_days": 0})}}, main)) == 0
+}
+
+test_cancel_from_active_without_hold_days_0_is_denied if {
+	main := {"lz_yaml": {"products-sandbox-neu": lz("products-sandbox-neu", {})}}
+	some msg in compared({"lz_yaml": {"products-sandbox-neu": decommissioned("products-sandbox-neu", "2020-01-01", {"state": "cancelled", "hold_days": 1})}}, main)
+	contains(msg, "state cancelled follows decommissioned on main")
+}
+
+test_experiment_cancel_from_active_with_hold_days_0_is_denied if {
+	main := {"lz_yaml": {"exp-aks": lz("exp-aks", {})}}
+	some msg in compared({"lz_yaml": {"exp-aks": decommissioned("exp-aks", "2020-01-01", {"state": "cancelled", "hold_days": 0})}}, main)
+	contains(msg, "state cancelled follows decommissioned on main")
+}
+
 test_new_file_cancelled_is_denied if {
 	some msg in compared({"lz_yaml": {"exp-aks": decommissioned("exp-aks", "2020-01-01", {"state": "cancelled"})}}, {})
 	contains(msg, "state cancelled follows decommissioned on main")
