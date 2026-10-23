@@ -335,6 +335,18 @@ test_name_not_file_name_is_denied if {
 	contains(msg, "landing-zones/products-sandbox-neu.yaml: name is products-prod-neu; it must be the file name")
 }
 
+hub_neu := {"name": "vnet-hub-neu", "cloud": "azure", "region": "northeurope", "cidr": "10.0.0.0/20"}
+
+test_landing_zone_in_a_hub_region_passes if {
+	y := {"products-sandbox-neu": lz("products-sandbox-neu", {"cloud": "azure", "region": "northeurope"})}
+	not denies({"hubs": [hub_neu], "lz_yaml": y}, "there is no")
+}
+
+test_landing_zone_without_a_hub_is_denied if {
+	y := {"products-sandbox-itn": lz("products-sandbox-itn", {"cloud": "azure", "region": "italynorth"})}
+	denies({"hubs": [hub_neu], "lz_yaml": y}, "landing-zones/products-sandbox-itn.yaml: there is no azure hub in italynorth in catalog/ipam.yaml")
+}
+
 test_new_experiment_ttl_90_passes if {
 	count(compared({"lz_yaml": {"exp-aks": lz("exp-aks", {"archetype": "experiment", "ttl": "90d"})}}, {})) == 0
 }
