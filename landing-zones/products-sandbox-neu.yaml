@@ -1,0 +1,16 @@
+# Trislab's own products in sandbox (05 section 2).
+name: products-sandbox-neu
+state: active
+cloud: azure
+archetype: standard
+owner: { products: true }
+subscription: sub-products-sandbox-neu
+region: northeurope
+network:
+  spoke_cidr: 10.32.0.0/20
+budget:
+  monthly_eur: 10
+access:
+  - group: grp-devops
+    role: Contributor
+    pim: true
