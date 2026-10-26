@@ -8,7 +8,7 @@ locals {
 }
 
 module "landing_zone" {
-  source = "git::https://github.com/TrislabCompany/tl-platform.git//landing-zone?ref=v0.4.0"
+  source = "git::https://github.com/TrislabCompany/tl-platform.git//landing-zone?ref=v0.5.0"
 
   lz = yamldecode(file("${path.module}/../${var.landing_zone}.yaml"))
   catalog = {
@@ -36,4 +36,8 @@ module "landing_zone" {
     "0d1a0012-5c20-47bf-84b1-dbe55d285a65",
     "88fa6881-fefa-4264-9ce0-20021e3b90fe",
   ]
+
+  # spn-landingzones-apply, the owner of each landing zone's identities
+  # (ADR 0034). The plan runs as spn-landingzones-plan, so the ID is written here.
+  landingzones_apply_id = "d6b74fa7-b0bf-4f6c-855b-13e086fb9bc6"
 }
