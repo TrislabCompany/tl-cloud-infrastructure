@@ -57,7 +57,7 @@ locals {
     landingzones-plan = {
       workflow = "shared-plan.yml"
       trust    = local.plan_trust
-      graph    = ["Group.Read.All"]
+      graph    = ["Application.Read.All", "Group.Read.All"]
     }
     landingzones-apply = {
       workflow = "shared-apply.yml"
