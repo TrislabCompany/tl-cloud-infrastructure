@@ -52,7 +52,7 @@ patterns := {
 	"azurerm_storage_account": ["stplatformtfstate{nnnn}", "st{stampcompact}{nnnn}"],
 	"azurerm_log_analytics_workspace": ["log-platform", "log-{lz}"],
 	"azurerm_monitor_action_group": ["ag-finops", "ag-platform"],
-	"azurerm_consumption_budget_subscription": ["budget-{lz}"],
+	"azurerm_consumption_budget_subscription": ["budget-{lz}", "budget-exp-[a-z0-9]{2,12}"],
 	"azurerm_management_lock": ["lock-{purpose}(?:-{purpose})*"],
 	"azurerm_container_app_environment": ["cae-{stamp}"],
 	"azurerm_container_app": ["ca-{stamp}-{app}"],
