@@ -56,6 +56,8 @@ test_good_names_pass if {
 		["azurerm_user_assigned_identity", "id-oc-con-prod-appdeploy"],
 		["azurerm_management_lock", "lock-rg-platform-state"],
 		["azurerm_monitor_action_group", "ag-finops"],
+		["azurerm_consumption_budget_subscription", "budget-products-sandbox-neu"],
+		["azurerm_consumption_budget_subscription", "budget-exp-test"],
 		["azuread_group", "grp-data-cust-asg-prod-neu-readers"],
 	] {
 		count(denied(pair[0], {"name": pair[1], "display_name": pair[1]})) == 0
