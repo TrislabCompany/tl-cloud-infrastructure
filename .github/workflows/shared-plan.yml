@@ -321,6 +321,9 @@ jobs:
           TF_VAR_github_repository_id: ${{ github.repository_id }}
           TF_VAR_az_billing_account: ${{ vars.AZ_BILLING_ACCOUNT }}
           TF_VAR_az_billing_profile: ${{ vars.AZ_BILLING_PROFILE }}
+          TF_VAR_cloudflare_account_id: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          # global/edge only: the cloudflare provider's read-only token (16 section 7).
+          CLOUDFLARE_API_TOKEN: ${{ inputs.root == 'global/edge' && secrets.CLOUDFLARE_API_TOKEN_PLAN || '' }}
           # The github provider of landing-zones/_root, read-only on plan. Plans get no
           # GHCR pull token (ADR 0026).
           GITHUB_TOKEN: ${{ steps.layer.outputs.layer == 'landingzones' && steps.app.outputs.token || '' }}
