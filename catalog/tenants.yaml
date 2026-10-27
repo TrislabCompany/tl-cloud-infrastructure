@@ -4,5 +4,13 @@
 domains:
   - name: trislab.com
     owner: trislab
+  - name: dragonja.si
+    owner: dragonja
+  - name: juskoski.si
+    owner: juskoski
+  - name: ldistragracisce.si
+    owner: ldistragracisce
+  - name: spds.si
+    owner: spds
 
 tenants: []

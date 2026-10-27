@@ -1,0 +1,7 @@
+# The records dragonja.si held at zabec.net before Cloudflare, copied as they
+# were and not proxied, so the delegation changes nothing that runs today. The
+# site is on Trislab's hosting. There is no www record, and mail.dragonja.si
+# doesn't exist, so mail to the domain already fails today.
+apex: { name: dragonja.si, type: A, content: 212.44.101.122 }
+mx: { name: dragonja.si, type: MX, priority: 10, content: mail.dragonja.si }
+google: { name: dragonja.si, type: TXT, content: "google-site-verification=NsR_PZyxfhQi6ZLNjOrmuen18YLONgvuOYeeNsWhHd4" }
