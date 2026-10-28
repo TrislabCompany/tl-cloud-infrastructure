@@ -1,0 +1,4 @@
+# The alias cPanel made for the addon domain spds.si on the hosting. The zone
+# spds.si itself is not here: its DNS stays at domenca.com.
+apex: { name: spds.si.trislab.com, type: A, content: 212.44.101.122 }
+www: { name: www.spds.si.trislab.com, type: A, content: 212.44.101.122 }

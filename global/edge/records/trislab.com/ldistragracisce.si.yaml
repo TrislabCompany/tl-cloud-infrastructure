@@ -1,0 +1,4 @@
+# The alias cPanel made for the addon domain ldistragracisce.si on the hosting.
+# The zone ldistragracisce.si itself is not here: its DNS stays at freedns.si.
+apex: { name: ldistragracisce.si.trislab.com, type: A, content: 212.44.101.122 }
+www: { name: www.ldistragracisce.si.trislab.com, type: A, content: 212.44.101.122 }

@@ -1,0 +1,16 @@
+# Domains and the tenants on each stamp (07 section 2). global/edge creates one
+# Cloudflare zone per domain. A tenant is added by the PR that puts it on a
+# stamp.
+domains:
+  - name: trislab.com
+    owner: trislab
+  - name: dragonja.si
+    owner: dragonja
+  - name: juskoski.si
+    owner: juskoski
+  - name: ldistragracisce.si
+    owner: ldistragracisce
+  - name: spds.si
+    owner: spds
+
+tenants: []

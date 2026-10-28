@@ -1,0 +1,28 @@
+# The records spds.si held at domenca.com before Cloudflare, copied as they
+# were and not proxied, so the delegation changes nothing that runs today. The
+# site and its mail are on Trislab's hosting 212.44.101.122 (cPanel).
+
+# The site and the hosting.
+apex: { name: spds.si, type: A, content: 212.44.101.122 }
+www: { name: www.spds.si, type: CNAME, content: spds.si }
+ftp: { name: ftp.spds.si, type: CNAME, content: spds.si }
+cpanel: { name: cpanel.spds.si, type: A, content: 212.44.101.122 }
+whm: { name: whm.spds.si, type: A, content: 212.44.101.122 }
+webdisk: { name: webdisk.spds.si, type: A, content: 212.44.101.122 }
+
+# Mail on the hosting.
+mx: { name: spds.si, type: MX, priority: 0, content: mail.spds.si }
+mail: { name: mail.spds.si, type: A, content: 212.44.101.122 }
+webmail: { name: webmail.spds.si, type: A, content: 212.44.101.122 }
+spf: { name: spds.si, type: TXT, content: "v=spf1 ip4:212.44.101.122 a mx include:_spf.controlpanel.si ~all" }
+dmarc: { name: _dmarc.spds.si, type: TXT, content: "v=DMARC1; p=none" }
+dkim-default: { name: default._domainkey.spds.si, type: TXT, content: "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAx3Xd7f5aY9Zm5XMULPtbSBUOjVpCf2DuhgDIV9VHXZFnKwchxbraAtTubaftUh9UghSSLsGRVYz+FVk3BfkSNMQwLNz9+JugK1oVv7jpui+0Ptnp6X/rSEwkQyoZCxArenBqRv8OcLOaS5kZ3bDxb52C4kDqskZzyfuhEjEA1f37/ir0mS/wT1m/xrNhwQMEYKAxEbjesw8WZmcxHZrt+36fkAC08H0PpXW9YjrzqBFFfhOX45JjyJwv20isHmSOq5qxCmHRcK3ciD6mMUGJvnjqVFHVYO/Q1nnGxxt6AtXmikmHj12Lm2TK8fUaDp/zfBf1iHefXhUl7MUJe2iLzwIDAQAB;" }
+
+# Mail client set-up and groupware (cPanel).
+autodiscover: { name: autodiscover.spds.si, type: A, content: 212.44.101.122 }
+autoconfig: { name: autoconfig.spds.si, type: A, content: 212.44.101.122 }
+cpcalendars: { name: cpcalendars.spds.si, type: A, content: 212.44.101.122 }
+cpcontacts: { name: cpcontacts.spds.si, type: A, content: 212.44.101.122 }
+srv-autodiscover: { name: _autodiscover._tcp.spds.si, type: SRV, priority: 0, data: { weight: 0, port: 443, target: cpanelemaildiscovery.cpanel.net } }
+srv-caldavs: { name: _caldavs._tcp.spds.si, type: SRV, priority: 0, data: { weight: 0, port: 2080, target: scp-13.controlpanel.si } }
+srv-carddavs: { name: _carddavs._tcp.spds.si, type: SRV, priority: 0, data: { weight: 0, port: 2080, target: scp-13.controlpanel.si } }
