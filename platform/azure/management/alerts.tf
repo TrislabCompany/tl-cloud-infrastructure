@@ -13,8 +13,9 @@ resource "azurerm_monitor_action_group" "platform" {
   }
 }
 
-# Any Azure operation by an emergency access account (ADR 0047). Stateful, so
-# one operation sends one e-mail although the window overlaps the next run.
+# Any Azure operation by an emergency access account (ADR 0047). Runs every 15
+# minutes, the cheapest frequency. The 30-minute window catches activity log
+# entries that arrive late; stateful, so one operation still sends one e-mail.
 resource "azurerm_monitor_scheduled_query_rules_alert_v2" "emergency_access" {
   name                    = "emergency-access"
   resource_group_name     = azurerm_resource_group.management.name
@@ -22,8 +23,8 @@ resource "azurerm_monitor_scheduled_query_rules_alert_v2" "emergency_access" {
   description             = "An emergency access account made an Azure operation (ADR 0047)."
   scopes                  = [azurerm_log_analytics_workspace.platform.id]
   severity                = 0
-  evaluation_frequency    = "PT5M"
-  window_duration         = "PT15M"
+  evaluation_frequency    = "PT15M"
+  window_duration         = "PT30M"
   auto_mitigation_enabled = true
   tags                    = local.tags
 
