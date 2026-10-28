@@ -1,0 +1,3 @@
+# A client site on the hosting, under trislab.com.
+apex: { name: astragroup.trislab.com, type: A, content: 212.44.101.122 }
+www: { name: www.astragroup.trislab.com, type: A, content: 212.44.101.122 }

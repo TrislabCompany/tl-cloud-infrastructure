@@ -6,3 +6,19 @@ owners:
     kind: product
     code: web
     state: active
+  - slug: dragonja
+    kind: customer
+    code: dra
+    state: active
+  - slug: juskoski
+    kind: customer
+    code: jus
+    state: active
+  - slug: ldistragracisce
+    kind: customer
+    code: ldg
+    state: active
+  - slug: spds
+    kind: customer
+    code: spd
+    state: active

@@ -1,0 +1,5 @@
+# The records ldistragracisce.si held at freedns.si before Cloudflare, copied
+# as they were and not proxied, so the delegation changes nothing that runs
+# today. The site is on Trislab's hosting; the domain has no mail.
+apex: { name: ldistragracisce.si, type: A, content: 212.44.101.122 }
+www: { name: www.ldistragracisce.si, type: A, content: 212.44.101.122 }
