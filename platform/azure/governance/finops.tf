@@ -25,3 +25,12 @@ resource "azurerm_monitor_action_group" "finops" {
     use_common_alert_schema = true
   }
 }
+
+# A budget that names the action group is created only by a caller that can
+# read it: without this, every landing zone budget fails with a bare 401.
+resource "azurerm_role_assignment" "finops_landingzones" {
+  scope                = azurerm_monitor_action_group.finops.id
+  role_definition_name = "Monitoring Reader"
+  principal_id         = "d6b74fa7-b0bf-4f6c-855b-13e086fb9bc6" # spn-landingzones-apply
+  principal_type       = "ServicePrincipal"
+}
