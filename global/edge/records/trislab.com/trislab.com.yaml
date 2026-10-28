@@ -11,12 +11,12 @@ ftp: { name: ftp.trislab.com, type: A, content: 212.44.101.122 }
 cpanel: { name: cpanel.trislab.com, type: A, content: 212.44.101.122, proxied: true }
 
 # Mail: Google Workspace.
-mx-aspmx: { name: trislab.com, type: MX, priority: 1, content: aspmx.l.google.com }
-mx-alt1: { name: trislab.com, type: MX, priority: 5, content: alt1.aspmx.l.google.com }
-mx-alt2: { name: trislab.com, type: MX, priority: 5, content: alt2.aspmx.l.google.com }
-mx-alt3: { name: trislab.com, type: MX, priority: 10, content: alt3.aspmx.l.google.com }
-mx-alt4: { name: trislab.com, type: MX, priority: 10, content: alt4.aspmx.l.google.com }
-spf: { name: trislab.com, type: TXT, content: "v=spf1 ip4:212.44.113.26 +a +mx +ip4:212.44.101.122 +include:_spf.controlpanel.si include:_spf.google.com ~all" }
+gmail-aspmx: { name: trislab.com, type: MX, priority: 1, content: aspmx.l.google.com }
+gmail-alt1: { name: trislab.com, type: MX, priority: 5, content: alt1.aspmx.l.google.com }
+gmail-alt2: { name: trislab.com, type: MX, priority: 5, content: alt2.aspmx.l.google.com }
+gmail-alt3: { name: trislab.com, type: MX, priority: 10, content: alt3.aspmx.l.google.com }
+gmail-alt4: { name: trislab.com, type: MX, priority: 10, content: alt4.aspmx.l.google.com }
+spf-google: { name: trislab.com, type: TXT, content: "v=spf1 ip4:212.44.113.26 +a +mx +ip4:212.44.101.122 +include:_spf.controlpanel.si include:_spf.google.com ~all" }
 google: { name: trislab.com, type: TXT, content: "google-site-verification=QMOfBUlTpiaIN6yJyECqbzYPp6LNiOrFqS8T1Ly3ju0" }
 dmarc: { name: _dmarc.trislab.com, type: TXT, content: "v=DMARC1; p=none" }
 # DKIM of the hosting's mail, sent by the sites' forms.
