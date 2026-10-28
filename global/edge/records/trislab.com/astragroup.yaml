@@ -1,3 +1,4 @@
-# A client site on the hosting, under trislab.com.
-apex: { name: astragroup.trislab.com, type: A, content: 212.44.101.122 }
+# A client site on the hosting, under trislab.com. www is not proxied:
+# Cloudflare's free certificate covers only one level under trislab.com.
+apex: { name: astragroup.trislab.com, type: A, content: 212.44.101.122, proxied: true }
 www: { name: www.astragroup.trislab.com, type: A, content: 212.44.101.122 }
