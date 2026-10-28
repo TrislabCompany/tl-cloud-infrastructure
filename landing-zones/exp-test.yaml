@@ -1,0 +1,14 @@
+# Test experiment of phase 4: created, decommissioned and cancelled (ADR 0051).
+name: exp-test
+state: active
+cloud: azure
+archetype: experiment
+owner: { platform: true }
+subscription: sub-exp-test
+ttl: 1d
+budget:
+  monthly_eur: 10
+access:
+  - group: grp-devops
+    role: Contributor
+    pim: true
