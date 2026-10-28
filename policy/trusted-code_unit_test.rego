@@ -87,6 +87,27 @@ test_module_prefixed_tag_is_accepted if {
 	count(deny) == 0 with input as {"module": {"m": [{"source": "git::https://github.com/TrislabCompany/tl-platform.git//landing-zone?ref=landing-zone/v0.7.0"}]}}
 }
 
+test_module_prefixed_tag_of_a_nested_folder_is_accepted if {
+	count(deny) == 0 with input as {"module": {"m": [{"source": "github.com/TrislabCompany/tl-platform//stamps/aca-app?ref=aca-app/v1.0.0"}]}}
+}
+
+test_module_tag_of_another_folder_is_denied if {
+	some msg in deny with input as {"module": {"m": [{"source": "github.com/TrislabCompany/tl-platform//stamps/aca-app?ref=landing-zone/v0.4.0"}]}}
+	contains(msg, "has a source other than a tl-platform release tag")
+}
+
+test_module_tag_of_a_parent_folder_is_denied if {
+	some msg in deny with input as {"module": {"m": [{"source": "github.com/TrislabCompany/tl-platform//stamps/aca-app?ref=stamps/v1.0.0"}]}}
+	contains(msg, "has a source other than a tl-platform release tag")
+}
+
+test_tls_provider_is_accepted if {
+	count(deny) == 0 with input as {
+		"terraform": [{"required_providers": [{"tls": {"source": "hashicorp/tls"}}]}],
+		"resource": {"tls_private_key": {"k": [{"algorithm": "ED25519"}]}},
+	}
+}
+
 test_module_prefixed_tag_with_more_after_it_is_denied if {
 	some msg in deny with input as {"module": {"m": [{"source": "git::https://github.com/TrislabCompany/tl-platform.git//landing-zone?ref=landing-zone/v0.7.0-rc1"}]}}
 	contains(msg, "has a source other than a tl-platform release tag")
