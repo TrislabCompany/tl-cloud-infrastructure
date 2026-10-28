@@ -1,7 +1,37 @@
-# The records dragonja.si held at zabec.net before Cloudflare, copied as they
-# were and not proxied, so the delegation changes nothing that runs today. The
-# site is on Trislab's hosting. There is no www record, and mail.dragonja.si
-# doesn't exist, so mail to the domain already fails today.
-apex: { name: dragonja.si, type: A, content: 212.44.101.122 }
-mx: { name: dragonja.si, type: MX, priority: 10, content: mail.dragonja.si }
+# The records of dragonja.si. The site and its mail are on Trislab's hosting
+# 212.44.101.122 (cPanel). zabec.net served only the apex, a broken MX and the
+# Google verification, so the mail records are taken from the hosting's own
+# zone (cdns1.controlpanel.si), and the client set-up records follow
+# juskoski.si. Only the site is proxied: the hosting has no certificate for the
+# other names yet. Once AutoSSL has issued one, the web names are proxied as in
+# juskoski.si.
+
+# The site and the hosting.
+apex: { name: dragonja.si, type: A, content: 212.44.101.122, proxied: true }
+# DNS-only: the hosting's certificate doesn't cover it yet, so Full (strict)
+# would fail. Proxied once AutoSSL has added it.
+www: { name: www.dragonja.si, type: A, content: 212.44.101.122 }
+ftp: { name: ftp.dragonja.si, type: A, content: 212.44.101.122 }
+cpanel: { name: cpanel.dragonja.si, type: A, content: 212.44.101.122 }
+whm: { name: whm.dragonja.si, type: A, content: 212.44.101.122 }
+webdisk: { name: webdisk.dragonja.si, type: A, content: 212.44.101.122 }
+
+# Google Search Console.
 google: { name: dragonja.si, type: TXT, content: "google-site-verification=NsR_PZyxfhQi6ZLNjOrmuen18YLONgvuOYeeNsWhHd4" }
+
+# Mail on the hosting.
+mx: { name: dragonja.si, type: MX, priority: 0, content: mail.dragonja.si }
+mail: { name: mail.dragonja.si, type: A, content: 212.44.101.122 }
+webmail: { name: webmail.dragonja.si, type: A, content: 212.44.101.122 }
+spf: { name: dragonja.si, type: TXT, content: "v=spf1 +a +mx +ip4:212.44.101.122 +include:_spf.controlpanel.si ~all" }
+dmarc: { name: _dmarc.dragonja.si, type: TXT, content: "v=DMARC1; p=none" }
+dkim-default: { name: default._domainkey.dragonja.si, type: TXT, content: "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwmFY83cdBw7QjRkOuYmq/5U8FrYvtxa3rFiPXu4v8VwEk0mQV066hqW4KY32fD0y+sj/4TbcRfkQZeI5F/W69oOMd/D/qD4PiUFDFiIQ1I8fHLlKf14TqH46I3I9bDKvaGWXRkJuAtgX0riqsgbzd2f4vif5GgD6Jb6ZZiZWjQAS4AoviSAsjyDbKdw3CWMbZZcgGUUVLfwbY5wb0pMl5ySnmT0N5ltfaF/nqcGcel1QK5zgYzNOxPUjNrdkB8UR14N7arvALmN34HJ+hhAB3LKN8WRX/2UG51u8VFpeXzci3AzkzqxZ0qbfwLPXcBByolAs49cYXaCW+aNuyAZp2QIDAQAB;" }
+
+# Mail client set-up and groupware (cPanel).
+autodiscover: { name: autodiscover.dragonja.si, type: A, content: 212.44.101.122 }
+autoconfig: { name: autoconfig.dragonja.si, type: A, content: 212.44.101.122 }
+cpcalendars: { name: cpcalendars.dragonja.si, type: A, content: 212.44.101.122 }
+cpcontacts: { name: cpcontacts.dragonja.si, type: A, content: 212.44.101.122 }
+srv-autodiscover: { name: _autodiscover._tcp.dragonja.si, type: SRV, priority: 0, data: { weight: 0, port: 443, target: cpanelemaildiscovery.cpanel.net } }
+srv-caldavs: { name: _caldavs._tcp.dragonja.si, type: SRV, priority: 0, data: { weight: 0, port: 2080, target: cpcalendars.dragonja.si } }
+srv-carddavs: { name: _carddavs._tcp.dragonja.si, type: SRV, priority: 0, data: { weight: 0, port: 2080, target: cpcontacts.dragonja.si } }

@@ -1,28 +1,28 @@
-# The records juskoski.si held at domenca.com before Cloudflare, copied as they
-# were and not proxied, so the delegation changes nothing that runs today. The
-# site and its mail are on Trislab's hosting 212.44.101.122 (cPanel).
+# The records juskoski.si held at domenca.com before Cloudflare; the web names
+# are proxied. The site and its mail are on Trislab's hosting 212.44.101.122
+# (cPanel).
 
 # The site and the hosting.
-apex: { name: juskoski.si, type: A, content: 212.44.101.122 }
-www: { name: www.juskoski.si, type: CNAME, content: juskoski.si }
-ftp: { name: ftp.juskoski.si, type: CNAME, content: juskoski.si }
-cpanel: { name: cpanel.juskoski.si, type: A, content: 212.44.101.122 }
-whm: { name: whm.juskoski.si, type: A, content: 212.44.101.122 }
+apex: { name: juskoski.si, type: A, content: 212.44.101.122, proxied: true }
+www: { name: www.juskoski.si, type: CNAME, content: juskoski.si, proxied: true }
+ftp: { name: ftp.juskoski.si, type: A, content: 212.44.101.122 }
+cpanel: { name: cpanel.juskoski.si, type: A, content: 212.44.101.122, proxied: true }
+whm: { name: whm.juskoski.si, type: A, content: 212.44.101.122, proxied: true }
 webdisk: { name: webdisk.juskoski.si, type: A, content: 212.44.101.122 }
 
 # Mail on the hosting.
 mx: { name: juskoski.si, type: MX, priority: 0, content: mail.juskoski.si }
 mail: { name: mail.juskoski.si, type: A, content: 212.44.101.122 }
-webmail: { name: webmail.juskoski.si, type: A, content: 212.44.101.122 }
+webmail: { name: webmail.juskoski.si, type: A, content: 212.44.101.122, proxied: true }
 spf: { name: juskoski.si, type: TXT, content: "v=spf1 ip4:212.44.113.26 +a +mx +ip4:212.44.101.122 +include:_spf.controlpanel.si ~all" }
 dmarc: { name: _dmarc.juskoski.si, type: TXT, content: "v=DMARC1; p=none" }
 dkim-default: { name: default._domainkey.juskoski.si, type: TXT, content: "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArO75QHxTwJ/hPr5TbLyKRBzw7NQg7K6nKlFGSMb9f46iTbRXM4T8/hMqo6HeB1Vh1LFkUKLvc30uC7gbpZjCxhgjQWe2CoaU9sBsBJBaNEpSg6ThDtQequHMgGHe2pDq/3FrreJ19H5tC/clEp2cZLdcG7JTbMFf7h6GnF6JalI4yH9T2hzYca+UMYDt8DplJlCB7Bm6jtNon1NVX12fJvoGMeg9IqFLgAvsQtC0Z8f1W2cIh+1uszPjq8jM0p8lbcUKJ9be5AfT9O+skFcJ6HB1lSVcBVJJSmQd+7p2eXHbrtm5MEBEMQxt/4evzythAIBZkvrziaEy1rnFvtRhkwIDAQAB;" }
 
 # Mail client set-up and groupware (cPanel).
-autodiscover: { name: autodiscover.juskoski.si, type: A, content: 212.44.101.122 }
-autoconfig: { name: autoconfig.juskoski.si, type: A, content: 212.44.101.122 }
+autodiscover: { name: autodiscover.juskoski.si, type: A, content: 212.44.101.122, proxied: true }
+autoconfig: { name: autoconfig.juskoski.si, type: A, content: 212.44.101.122, proxied: true }
 cpcalendars: { name: cpcalendars.juskoski.si, type: A, content: 212.44.101.122 }
 cpcontacts: { name: cpcontacts.juskoski.si, type: A, content: 212.44.101.122 }
 srv-autodiscover: { name: _autodiscover._tcp.juskoski.si, type: SRV, priority: 0, data: { weight: 0, port: 443, target: cpanelemaildiscovery.cpanel.net } }
-srv-caldavs: { name: _caldavs._tcp.juskoski.si, type: SRV, priority: 0, data: { weight: 0, port: 2080, target: juskoski.si } }
-srv-carddavs: { name: _carddavs._tcp.juskoski.si, type: SRV, priority: 0, data: { weight: 0, port: 2080, target: juskoski.si } }
+srv-caldavs: { name: _caldavs._tcp.juskoski.si, type: SRV, priority: 0, data: { weight: 0, port: 2080, target: cpcalendars.juskoski.si } }
+srv-carddavs: { name: _carddavs._tcp.juskoski.si, type: SRV, priority: 0, data: { weight: 0, port: 2080, target: cpcontacts.juskoski.si } }

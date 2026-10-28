@@ -1,4 +1,5 @@
-# The alias cPanel made for the addon domain dragonja.si on the hosting. The
-# zone dragonja.si itself is not here: its DNS stays at zabec.net.
+# The alias cPanel made for the addon domain dragonja.si on the hosting; the
+# zone dragonja.si is in records/dragonja.si/. Not proxied: Cloudflare's free
+# certificate covers only one level under trislab.com.
 apex: { name: dragonja.si.trislab.com, type: A, content: 212.44.101.122 }
 www: { name: www.dragonja.si.trislab.com, type: A, content: 212.44.101.122 }
