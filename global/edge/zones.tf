@@ -21,6 +21,22 @@ resource "cloudflare_zone_setting" "ssl" {
   value      = "strict"
 }
 
+# Proxied names answer HTTP with a redirect to HTTPS, and only over TLS 1.2 or
+# later. DNS-only names don't pass Cloudflare, so neither applies to them.
+resource "cloudflare_zone_setting" "always_use_https" {
+  for_each   = cloudflare_zone.this
+  zone_id    = each.value.id
+  setting_id = "always_use_https"
+  value      = "on"
+}
+
+resource "cloudflare_zone_setting" "min_tls_version" {
+  for_each   = cloudflare_zone.this
+  zone_id    = each.value.id
+  setting_id = "min_tls_version"
+  value      = "1.2"
+}
+
 # A new zone's nameservers are known only after apply, so they are read from
 # the apply log or the Cloudflare dashboard, not from the plan.
 output "name_servers" {

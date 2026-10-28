@@ -1,24 +1,22 @@
-# The records trislab.com held at domenca.com before Cloudflare, copied as they
-# were and not proxied, so the delegation changes nothing that runs today
-# (10-roadmap.md section 8, PR 1). 212.44.101.122 is the hosting, and mail goes
-# to Google Workspace. When the site moves to the platform, its records change
-# here.
+# The records trislab.com held at domenca.com before Cloudflare (10-roadmap.md
+# section 8, PR 1); the web names are proxied. 212.44.101.122 is the hosting,
+# and mail goes to Google Workspace. When the site moves to the platform, its
+# records change here.
 
 # The corporate site and the hosting.
-apex: { name: trislab.com, type: A, content: 212.44.101.122 }
-www: { name: www.trislab.com, type: CNAME, content: trislab.com }
+apex: { name: trislab.com, type: A, content: 212.44.101.122, proxied: true }
+www: { name: www.trislab.com, type: CNAME, content: trislab.com, proxied: true }
 mail: { name: mail.trislab.com, type: A, content: 212.44.101.122 }
 ftp: { name: ftp.trislab.com, type: A, content: 212.44.101.122 }
-cpanel: { name: cpanel.trislab.com, type: A, content: 212.44.101.122 }
+cpanel: { name: cpanel.trislab.com, type: A, content: 212.44.101.122, proxied: true }
 
-# Mail: Google Workspace, and Microsoft's domain verification.
-mx-aspmx: { name: trislab.com, type: MX, priority: 1, content: aspmx.l.google.com }
-mx-alt1: { name: trislab.com, type: MX, priority: 5, content: alt1.aspmx.l.google.com }
-mx-alt2: { name: trislab.com, type: MX, priority: 5, content: alt2.aspmx.l.google.com }
-mx-alt3: { name: trislab.com, type: MX, priority: 10, content: alt3.aspmx.l.google.com }
-mx-alt4: { name: trislab.com, type: MX, priority: 10, content: alt4.aspmx.l.google.com }
-mx-microsoft: { name: trislab.com, type: MX, priority: 32767, content: ms10140753.msv1.invalid }
-spf: { name: trislab.com, type: TXT, content: "v=spf1 ip4:212.44.113.26 +a +mx +ip4:212.44.101.122 +include:_spf.controlpanel.si ~all" }
+# Mail: Google Workspace.
+gmail-aspmx: { name: trislab.com, type: MX, priority: 1, content: aspmx.l.google.com }
+gmail-alt1: { name: trislab.com, type: MX, priority: 5, content: alt1.aspmx.l.google.com }
+gmail-alt2: { name: trislab.com, type: MX, priority: 5, content: alt2.aspmx.l.google.com }
+gmail-alt3: { name: trislab.com, type: MX, priority: 10, content: alt3.aspmx.l.google.com }
+gmail-alt4: { name: trislab.com, type: MX, priority: 10, content: alt4.aspmx.l.google.com }
+spf-google: { name: trislab.com, type: TXT, content: "v=spf1 ip4:212.44.113.26 +a +mx +ip4:212.44.101.122 +include:_spf.controlpanel.si include:_spf.google.com ~all" }
 google: { name: trislab.com, type: TXT, content: "google-site-verification=QMOfBUlTpiaIN6yJyECqbzYPp6LNiOrFqS8T1Ly3ju0" }
 dmarc: { name: _dmarc.trislab.com, type: TXT, content: "v=DMARC1; p=none" }
 # DKIM of the hosting's mail, sent by the sites' forms.

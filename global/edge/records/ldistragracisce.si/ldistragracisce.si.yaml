@@ -1,5 +1,31 @@
-# The records ldistragracisce.si held at freedns.si before Cloudflare, copied
-# as they were and not proxied, so the delegation changes nothing that runs
-# today. The site is on Trislab's hosting; the domain has no mail.
-apex: { name: ldistragracisce.si, type: A, content: 212.44.101.122 }
-www: { name: www.ldistragracisce.si, type: A, content: 212.44.101.122 }
+# The records of ldistragracisce.si. The site and its mail are on Trislab's
+# hosting 212.44.101.122 (cPanel). freedns.si served only the site, so the mail
+# records are taken from the hosting's own zone (cdns1.controlpanel.si), and the
+# client set-up records follow juskoski.si. Only the site is proxied: the
+# hosting has no certificate for the other names yet. Once AutoSSL has issued
+# one, the web names are proxied as in juskoski.si.
+
+# The site and the hosting.
+apex: { name: ldistragracisce.si, type: A, content: 212.44.101.122, proxied: true }
+www: { name: www.ldistragracisce.si, type: CNAME, content: ldistragracisce.si, proxied: true }
+ftp: { name: ftp.ldistragracisce.si, type: A, content: 212.44.101.122 }
+cpanel: { name: cpanel.ldistragracisce.si, type: A, content: 212.44.101.122 }
+whm: { name: whm.ldistragracisce.si, type: A, content: 212.44.101.122 }
+webdisk: { name: webdisk.ldistragracisce.si, type: A, content: 212.44.101.122 }
+
+# Mail on the hosting.
+mx: { name: ldistragracisce.si, type: MX, priority: 0, content: mail.ldistragracisce.si }
+mail: { name: mail.ldistragracisce.si, type: A, content: 212.44.101.122 }
+webmail: { name: webmail.ldistragracisce.si, type: A, content: 212.44.101.122 }
+spf: { name: ldistragracisce.si, type: TXT, content: "v=spf1 ip4:212.44.113.26 ip4:212.44.101.122 a mx include:_spf.controlpanel.si ~all" }
+dmarc: { name: _dmarc.ldistragracisce.si, type: TXT, content: "v=DMARC1; p=none" }
+dkim-default: { name: default._domainkey.ldistragracisce.si, type: TXT, content: "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1zpPzrMBPj3Ow6NGzAYqYB9pXV+F5z+I2BsJN4MmNTsytuQwkcMVNTc1EHOyvU11oBGcbEhwXIkg/1xPM7xJbhWOuTu26QG8cXlns3ByeAuOyCpPiGsswy3otm2SLnTQqzRtcYPlGKEJZgPuDeTF2JKgy1wpcjzlqczON003OLeDqjgjusjiHcqMrhrDV/Y3jVQWdV7knulFtDMgL4nngtPGkBypMCVapx1wjojj8ydcerG/1BJtHNBF9jP0vxTU418FxzKOaDC9+6CQkm27YjDJ3BB7cGhO20Z10FxHeRmAAHP6qmKqPyA3zKM3Q6h/MuU8K+wlxlaYIeTQ9LMoJwIDAQAB;" }
+
+# Mail client set-up and groupware (cPanel).
+autodiscover: { name: autodiscover.ldistragracisce.si, type: A, content: 212.44.101.122 }
+autoconfig: { name: autoconfig.ldistragracisce.si, type: A, content: 212.44.101.122 }
+cpcalendars: { name: cpcalendars.ldistragracisce.si, type: A, content: 212.44.101.122 }
+cpcontacts: { name: cpcontacts.ldistragracisce.si, type: A, content: 212.44.101.122 }
+srv-autodiscover: { name: _autodiscover._tcp.ldistragracisce.si, type: SRV, priority: 0, data: { weight: 0, port: 443, target: cpanelemaildiscovery.cpanel.net } }
+srv-caldavs: { name: _caldavs._tcp.ldistragracisce.si, type: SRV, priority: 0, data: { weight: 0, port: 2080, target: cpcalendars.ldistragracisce.si } }
+srv-carddavs: { name: _carddavs._tcp.ldistragracisce.si, type: SRV, priority: 0, data: { weight: 0, port: 2080, target: cpcontacts.ldistragracisce.si } }
