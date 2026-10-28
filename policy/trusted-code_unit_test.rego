@@ -83,6 +83,20 @@ test_short_module_source_is_accepted if {
 	count(deny) == 0 with input as {"module": {"m": [{"source": "github.com/TrislabCompany/tl-platform//stamps/aca-app?ref=v1.4.0"}]}}
 }
 
+test_module_prefixed_tag_is_accepted if {
+	count(deny) == 0 with input as {"module": {"m": [{"source": "git::https://github.com/TrislabCompany/tl-platform.git//landing-zone?ref=landing-zone/v0.7.0"}]}}
+}
+
+test_module_prefixed_tag_with_more_after_it_is_denied if {
+	some msg in deny with input as {"module": {"m": [{"source": "git::https://github.com/TrislabCompany/tl-platform.git//landing-zone?ref=landing-zone/v0.7.0-rc1"}]}}
+	contains(msg, "has a source other than a tl-platform release tag")
+}
+
+test_module_prefixed_branch_is_denied if {
+	some msg in deny with input as {"module": {"m": [{"source": "git::https://github.com/TrislabCompany/tl-platform.git//landing-zone?ref=landing-zone/main"}]}}
+	contains(msg, "has a source other than a tl-platform release tag")
+}
+
 test_module_source_without_ref_is_denied if {
 	some msg in deny with input as {"module": {"m": [{"source": "git::https://github.com/TrislabCompany/tl-platform.git//landing-zone"}]}}
 	contains(msg, "has a source other than a tl-platform release tag")

@@ -19,12 +19,14 @@ allowed_sources := {
 }
 
 # Module sources: a local path, or a folder of the tl-platform repository at a
-# release tag and nothing else. Its v* tags can't be moved (09 section 8), so a
-# tag always means the same reviewed code; a branch or a missing ref doesn't.
+# release tag and nothing else: <module>/v<x.y.z>, or v<x.y.z> for the
+# landing-zone releases before the prefix. Its tags can't be moved (09 section
+# 8), so a tag always means the same reviewed code; a branch or a missing ref
+# doesn't.
 allowed_module_patterns := [
 	`^\.\.?/`,
-	`^git::https://github\.com/TrislabCompany/tl-platform\.git//[A-Za-z0-9._/-]+\?ref=v[0-9]+\.[0-9]+\.[0-9]+$`,
-	`^github\.com/TrislabCompany/tl-platform(\.git)?//[A-Za-z0-9._/-]+\?ref=v[0-9]+\.[0-9]+\.[0-9]+$`,
+	`^git::https://github\.com/TrislabCompany/tl-platform\.git//[A-Za-z0-9._/-]+\?ref=([a-z0-9-]+/)?v[0-9]+\.[0-9]+\.[0-9]+$`,
+	`^github\.com/TrislabCompany/tl-platform(\.git)?//[A-Za-z0-9._/-]+\?ref=([a-z0-9-]+/)?v[0-9]+\.[0-9]+\.[0-9]+$`,
 ]
 
 deny contains msg if {
