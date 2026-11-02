@@ -68,7 +68,7 @@ patterns := {
 		"spn-lz-{lz}-(?:plan|deploy)",
 	],
 	"azuread_group": [
-		"grp-devops", "grp-platform-admins", "grp-regulated-admins",
+		"grp-devops", "grp-platform-admins", "grp-regulated-admins", "grp-sandbox-trislab",
 		"grp-cust-{cust}-admins",
 		"grp-data-sandbox-(?:readers|admins)",
 		"grp-data-{lz}-(?:readers|admins)",
