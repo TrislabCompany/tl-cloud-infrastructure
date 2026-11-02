@@ -1,7 +1,7 @@
 package catalog
 
 owner_list := [
-	{"slug": "website-trislab", "kind": "product", "code": "web", "state": "active"},
+	{"slug": "corporate-site", "kind": "product", "code": "web", "state": "active"},
 	{"slug": "construction", "kind": "product", "code": "con", "state": "active"},
 	{"slug": "okna-capris", "kind": "customer", "code": "oc", "state": "active"},
 	{"slug": "astra-group", "kind": "customer", "code": "asg", "state": "active"},
@@ -18,8 +18,9 @@ good := {
 	"owners": owner_list,
 	"regions": region_list,
 	"repos": [
-		{"name": "website-trislab", "product": "website-trislab", "template": "tl-template-spa", "maintainers": ["octo-anna"], "state": "active"},
-		{"name": "construction", "product": "construction", "customer": "okna-capris", "template": "tl-template-saas", "maintainers": ["octo-anna", "octo-marko"], "state": "archived", "archived_on": "2026-09-01"},
+		{"name": "trislab-website-corporate-site", "product": "corporate-site", "template": "tl-template-website", "maintainers": ["octo-anna"], "state": "active"},
+		{"name": "trislab-saas-construction", "product": "construction", "template": "tl-template-saas", "maintainers": ["octo-anna", "octo-marko"], "state": "active"},
+		{"name": "okna-capris-webapp-construction", "product": "construction", "customer": "okna-capris", "template": "tl-template-webapp", "maintainers": ["octo-marko"], "state": "archived", "archived_on": "2026-09-01"},
 	],
 	"domains": [
 		{"name": "trislab.com", "owner": "trislab"},
@@ -27,8 +28,8 @@ good := {
 		{"name": "astra-group.example", "owner": "astra-group"},
 	],
 	"tenants": [
-		{"name": "website-trislab", "customer": "trislab", "stamp": "products-prod-neu/website-trislab", "hostnames": [
-			{"fqdn": "prod-website-trislab.trislab.com", "app": "web"},
+		{"name": "corporate-site", "customer": "trislab", "stamp": "products-prod-neu/corporate-site", "hostnames": [
+			{"fqdn": "prod-corporate-site.trislab.com", "app": "web"},
 			{"fqdn": "trislab.com", "app": "web"},
 			{"fqdn": "www.trislab.com", "app": "web"},
 		]},
@@ -45,11 +46,26 @@ good := {
 	"pools": {"hubs": "10.0.0.0/12", "prod": "10.16.0.0/12", "sandbox": "10.32.0.0/12"},
 	"hubs": [{"name": "vnet-hub-neu", "cloud": "azure", "region": "northeurope", "cidr": "10.0.0.0/20", "subnets": {"GatewaySubnet": "10.0.0.0/27"}}],
 	"landing_zones": [
-		{"name": "products-prod-neu", "cidr": "10.16.0.0/20", "stamps": {"website-trislab": "10.16.0.0/27", "construction-shared-01": "10.16.0.64/26"}},
-		{"name": "products-sandbox-neu", "cidr": "10.32.0.0/20", "stamps": {"website-trislab-staging": "10.32.0.0/27"}},
+		{"name": "products-prod-neu", "cidr": "10.16.0.0/20", "stamps": {"corporate-site": "10.16.0.0/27", "construction-shared-01": "10.16.0.64/26"}},
+		{"name": "products-sandbox-neu", "cidr": "10.32.0.0/20", "stamps": {"corporate-site-staging": "10.32.0.0/27"}},
 		{"name": "cust-asg-prod-neu", "cidr": "10.16.32.0/20"},
 	],
+	"stamp_yaml": {
+		"products-prod-neu/corporate-site": stamp("corporate-site", "trislab-website-corporate-site"),
+		"products-prod-neu/construction-shared-01": stamp("construction", "trislab-saas-construction"),
+		"cust-asg-prod-neu/construction": stamp("construction", "trislab-saas-construction"),
+		"cust-asg-sandbox-neu/construction-dev": stamp("construction", "trislab-saas-construction"),
+		"cust-oc-prod-neu/construction": stamp("construction", "trislab-saas-construction"),
+	},
 }
+
+# The fields of a stamp.yaml that the rules read.
+stamp(product, repo) := {"template": "aca-app", "version": "v1.0.0", "product": product, "apps": [
+	{"name": "web", "repo": repo, "ingress": "external", "port": 8080},
+	{"name": "worker", "repo": repo, "ingress": "none"},
+]}
+
+with_stamp(key, s) := object.union(good, {"stamp_yaml": object.union(good.stamp_yaml, {key: s})})
 
 with_list(list, entries) := object.union(good, {list: entries})
 
@@ -103,6 +119,7 @@ test_bad_values_are_denied if {
 	denies(with_list("regions", [object.union(region_list[0], {"cloud": "aws"})]), "regions[0].cloud is aws")
 	denies(with_list("regions", [object.union(region_list[0], {"state": "deprecated"})]), "regions[0].state is deprecated")
 	denies(with_list("repos", [object.union(good.repos[0], {"template": "tl-template-api"})]), "template is tl-template-api")
+	denies(with_list("repos", [object.union(good.repos[0], {"template": "tl-template-spa"})]), "template is tl-template-spa")
 	denies(with_list("tenants", [object.union(good.tenants[3], {"stamp": "construction-dev"})]), "stamp is construction-dev")
 }
 
@@ -137,8 +154,11 @@ test_region_rules if {
 # ---- repos.yaml ----
 
 test_repo_rules if {
-	denies(with_list("repos", [object.union(good.repos[0], {"product": "construction"})]), "the two must be equal")
-	denies(with_list("repos", [object.union(good.repos[0], {"name": "hunting", "product": "hunting"})]), "is not a product in catalog/owners.yaml")
+	denies(with_list("repos", [object.union(good.repos[0], {"name": "corporate-site"})]), "corporate-site must be named trislab-website-corporate-site")
+	denies(with_list("repos", [object.union(good.repos[0], {"product": "construction"})]), "must be named trislab-website-construction")
+	denies(with_list("repos", [object.union(good.repos[0], {"template": "tl-template-saas"})]), "must be named trislab-saas-corporate-site")
+	denies(with_list("repos", [object.union(good.repos[2], {"name": "trislab-webapp-construction"})]), "must be named okna-capris-webapp-construction")
+	denies(with_list("repos", [object.union(good.repos[0], {"name": "trislab-website-hunting", "product": "hunting"})]), "is not a product in catalog/owners.yaml")
 	denies(with_list("repos", [object.union(good.repos[0], {"customer": "vbs-lawyers"})]), "is not a customer in catalog/owners.yaml")
 	denies(with_list("repos", [object.union(good.repos[0], {"maintainers": []})]), "needs at least one maintainer")
 	denies(with_list("repos", [object.union(good.repos[0], {"maintainers": ["-bad-"]})]), "needs at least one maintainer")
@@ -207,6 +227,26 @@ test_hostname_two_labels_below_its_domain_is_denied if {
 	denies(with_list("tenants", [t]), "is more than one label below trislab.com")
 }
 
+# ---- stamp.yaml ----
+
+test_tenant_on_a_stamp_without_stamp_yaml_is_denied if {
+	denies(with_list("tenants", [object.union(good.tenants[3], {"stamp": "cust-asg-sandbox-neu/construction-test"})]), "which has no stamps/cust-asg-sandbox-neu/construction-test/stamp.yaml")
+}
+
+test_hostname_app_must_be_an_external_app_of_the_stamp if {
+	denies(with_list("tenants", [object.union(good.tenants[3], {"hostnames": [{"fqdn": "dev.trislab.com", "app": "api"}]})]), "names the app api, which is not an app of the stamp")
+	denies(with_list("tenants", [object.union(good.tenants[3], {"hostnames": [{"fqdn": "dev.trislab.com", "app": "worker"}]})]), "names the app worker, which is not an app of the stamp")
+	internal := stamp("construction", "trislab-saas-construction")
+	no_ingress := {"product": "construction", "apps": [{"name": "web", "repo": "trislab-saas-construction", "port": 8080}]}
+	denies(with_stamp("products-prod-neu/construction-shared-01", object.union(internal, {"apps": [object.union(internal.apps[0], {"ingress": "internal"})]})), "names the app web, which is not an app of the stamp with ingress: external")
+	denies(with_stamp("products-prod-neu/construction-shared-01", no_ingress), "names the app web, which is not an app of the stamp with ingress: external")
+}
+
+test_app_repo_must_be_an_active_repository if {
+	denies(with_stamp("products-sandbox-neu/construction-dev", stamp("construction", "trislab-saas-hunting")), "deploys from trislab-saas-hunting, which is not an active repository")
+	denies(with_stamp("products-sandbox-neu/construction-dev", stamp("construction", "okna-capris-webapp-construction")), "deploys from okna-capris-webapp-construction, which is not an active repository")
+}
+
 # ---- ipam.yaml ----
 
 test_pools_are_fixed if {
@@ -272,16 +312,51 @@ test_removed_owner_is_denied if {
 	contains(msg, "okna-capris was removed or renamed")
 }
 
-test_renamed_owner_is_denied if {
-	pr := with_list("owners", array.concat([object.union(owner_list[0], {"slug": "website"})], array.slice(owner_list, 1, 4)))
-	some msg in compared(pr, {"owners": owner_list})
+# main's owners before step A8 renames website-trislab to corporate-site.
+main_owners := array.concat([object.union(owner_list[0], {"slug": "website-trislab"})], array.slice(owner_list, 1, 4))
+
+test_renaming_an_unreferenced_owner_passes if {
+	count(compared(good, {"owners": main_owners})) == 0
+	count(compared(good, {"owners": main_owners, "repos": [good.repos[1]], "stamp_yaml": {"x/y": stamp("construction", "z")}})) == 0
+}
+
+test_renaming_a_referenced_owner_is_denied if {
+	some msg in compared(good, {"owners": main_owners, "stamp_yaml": {"products-prod-neu/website-trislab": stamp("website-trislab", "website-trislab")}})
 	contains(msg, "website-trislab was removed or renamed")
+	some msg2 in compared(good, {"owners": main_owners, "repos": [object.union(good.repos[0], {"name": "website-trislab", "product": "website-trislab"})]})
+	contains(msg2, "website-trislab was removed or renamed")
+}
+
+test_renaming_a_referenced_customer_is_denied if {
+	main := array.concat(array.slice(owner_list, 0, 3), [object.union(owner_list[3], {"slug": "astra"})])
+	some msg in compared(good, {"owners": main, "tenants": [object.union(good.tenants[3], {"customer": "astra"})]})
+	contains(msg, "astra was removed or renamed")
+	some msg2 in compared(good, {"owners": main, "domains": [{"name": "astra-group.example", "owner": "astra"}]})
+	contains(msg2, "astra was removed or renamed")
+	some msg3 in compared(good, {"owners": main, "repos": [object.union(good.repos[2], {"customer": "astra"})]})
+	contains(msg3, "astra was removed or renamed")
+	some msg4 in compared(good, {"owners": main, "lz_yaml": {"cust-asg-prod-neu": {"name": "cust-asg-prod-neu"}}})
+	contains(msg4, "astra was removed or renamed")
+}
+
+test_renamed_owner_with_another_code_is_denied if {
+	pr := with_list("owners", array.concat([object.union(owner_list[0], {"code": "wbs"})], array.slice(owner_list, 1, 4)))
+	some msg in compared(pr, {"owners": main_owners})
+	contains(msg, "website-trislab was removed or renamed")
+}
+
+test_reused_code_is_denied if {
+	main := array.concat([object.union(main_owners[0], {"state": "retired"})], array.slice(owner_list, 1, 4))
+	some msg in compared(good, {"owners": main})
+	contains(msg, "corporate-site takes the code web of website-trislab on main")
+	some msg2 in compared(good, {"owners": main_owners, "repos": [object.union(good.repos[0], {"name": "website-trislab", "product": "website-trislab"})]})
+	contains(msg2, "corporate-site takes the code web of website-trislab on main")
 }
 
 test_changed_owner_code_is_denied if {
 	pr := with_list("owners", array.concat([object.union(owner_list[0], {"code": "wbs"})], array.slice(owner_list, 1, 4)))
 	some msg in compared(pr, {"owners": owner_list})
-	contains(msg, "the code of website-trislab changed from web to wbs")
+	contains(msg, "the code of corporate-site changed from web to wbs")
 }
 
 test_removed_region_is_denied if {

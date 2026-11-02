@@ -1,7 +1,7 @@
 package tags
 
 catalog := {"owners": [
-	{"slug": "website-trislab", "kind": "product", "code": "web", "state": "active"},
+	{"slug": "corporate-site", "kind": "product", "code": "web", "state": "active"},
 	{"slug": "okna-capris", "kind": "customer", "code": "oc", "state": "active"},
 ]}
 
@@ -23,7 +23,7 @@ test_pipeline_test_tags_pass if {
 }
 
 test_owner_slugs_pass if {
-	count(denied({"tags": {"Product": "website-trislab", "Customer": "okna-capris", "EnvironmentType": "sandbox", "EnvironmentName": "pr142"}})) == 0
+	count(denied({"tags": {"Product": "corporate-site", "Customer": "okna-capris", "EnvironmentType": "sandbox", "EnvironmentName": "pr142"}})) == 0
 }
 
 test_missing_tag_is_denied if {
@@ -46,7 +46,7 @@ test_unregistered_customer_is_denied if {
 }
 
 test_product_slug_as_customer_is_denied if {
-	some msg in denied({"tags": object.union(good_tags, {"Customer": "website-trislab"})})
+	some msg in denied({"tags": object.union(good_tags, {"Customer": "corporate-site"})})
 	contains(msg, "the tag Customer")
 }
 

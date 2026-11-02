@@ -1,0 +1,85 @@
+name: Stamp Check
+
+# Checks each stamp folder a PR changes (06 sections 2.1 and 4):
+#
+#   - the folder holds only stamp.yaml, main.tf and .terraform.lock.hcl, so no
+#     hand-written file runs with the deploy identity
+#   - the ref of the module source in main.tf is <template>/<version> from
+#     stamp.yaml, such as aca-app/v1.0.0
+#
+# The JSON schema check, the generator diff and the unique stamp code come
+# before the second stamp (10 section 13). The job `stamp-check` is a required
+# check on main; it passes when no file under stamps/** changed.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions: {}
+
+concurrency:
+  group: stamp-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  folders:
+    name: folders
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check the changed stamp folders
+        env:
+          BASE: origin/${{ github.event.pull_request.base.ref }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # stamps/<lz>/<folder> of each changed file, if the folder is still on the branch.
+          folders=$(git diff --name-only "$(git merge-base "$BASE" "$HEAD")" "$HEAD" -- stamps/ \
+            | awk -F/ 'NF > 3 { print $1 "/" $2 "/" $3 }' | sort -u | while read -r d; do if [ -d "$d" ]; then echo "$d"; fi; done)
+          if [ -z "$folders" ]; then
+            echo "No stamp folder changed."
+            exit 0
+          fi
+          failed=0
+          for d in $folders; do
+            echo "::group::$d"
+            bad=0
+            extra=$(find "$d" -mindepth 1 ! -type d ! -path "$d/stamp.yaml" ! -path "$d/main.tf" ! -path "$d/.terraform.lock.hcl")
+            if [ -n "$extra" ]; then
+              while read -r f; do echo "::error file=$f::$d holds $f; a stamp folder holds only stamp.yaml, main.tf and .terraform.lock.hcl (06 section 4)"; done <<< "$extra"
+              bad=1
+            fi
+            if [ ! -f "$d/stamp.yaml" ] || [ ! -f "$d/main.tf" ]; then
+              echo "::error::$d needs stamp.yaml and main.tf (06 section 2.1)"
+              bad=1
+            else
+              want="$(yq '.template' "$d/stamp.yaml")/$(yq '.version' "$d/stamp.yaml")"
+              refs=$(grep -oE '^[[:space:]]*source[[:space:]]*=[[:space:]]*"[^"]*"' "$d/main.tf" | grep -oE '\?ref=[^"&]+' | sed 's/^?ref=//' | sort -u || true)
+              if [ "$refs" != "$want" ]; then
+                echo "::error file=$d/main.tf::the module source of $d/main.tf has the ref ${refs:-none}; stamp.yaml says $want (06 section 2.1)"
+                bad=1
+              fi
+            fi
+            if [ "$bad" = 0 ]; then echo "$d: ok"; else failed=1; fi
+            echo "::endgroup::"
+          done
+          exit "$failed"
+
+  stamp-check:
+    name: stamp-check
+    needs: [folders]
+    if: always()
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "folders: $RESULTS"
+          if grep -qE 'failure|cancelled' <<< "$RESULTS"; then exit 1; fi
