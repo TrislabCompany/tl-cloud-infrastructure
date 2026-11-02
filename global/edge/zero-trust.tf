@@ -6,7 +6,7 @@
 # account only in the dashboard (09-bootstrap.md section 10).
 import {
   to = cloudflare_zero_trust_organization.this
-  id = "accounts/${var.cloudflare_account_id}"
+  id = var.cloudflare_account_id
 }
 
 resource "cloudflare_zero_trust_organization" "this" {
