@@ -47,12 +47,14 @@ locals {
     global-plan = {
       workflow = "shared-plan.yml"
       trust    = local.plan_trust
-      graph    = []
+      graph    = ["Application.Read.All", "Group.Read.All"]
     }
+    # global/edge owns app-cloudflare-access and reads the Access groups by
+    # name (07-catalog-and-ipam.md section 3.3, ADR 0027).
     global-apply = {
       workflow = "shared-apply.yml"
       trust    = { global = "environment:global" }
-      graph    = []
+      graph    = ["Application.ReadWrite.OwnedBy", "Group.Read.All"]
     }
     landingzones-plan = {
       workflow = "shared-plan.yml"

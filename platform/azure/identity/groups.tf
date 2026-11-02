@@ -26,6 +26,10 @@ locals {
       name        = "grp-data-sandbox-admins"
       description = "Administer the data of the sandbox landing zones' stamps (ADR 0052)."
     }
+    sandbox-trislab = {
+      name        = "grp-sandbox-trislab"
+      description = "Admitted to Trislab's sandbox hostnames by Cloudflare Access (07-catalog-and-ipam.md section 3.3)."
+    }
   }
 
   # Reader on mg-root (02-architecture.md section 6), direct while pim is false
