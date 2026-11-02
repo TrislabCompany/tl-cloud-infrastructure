@@ -130,6 +130,7 @@ test_management_group_display_name if {
 
 test_entra_display_names_are_checked if {
 	count(denied("azuread_application", {"display_name": "spn-lz-cust-oc-prod-neu-deploy"})) == 0
+	count(denied("azuread_application", {"display_name": "app-cloudflare-access"})) == 0
 	count(denied("azuread_application", {"display_name": "tl-github-plan"})) > 0
 }
 

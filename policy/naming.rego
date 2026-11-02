@@ -66,6 +66,7 @@ patterns := {
 	"azuread_application": [
 		"spn-(?:platform|global|landingzones)-(?:plan|apply)",
 		"spn-lz-{lz}-(?:plan|deploy)",
+		"app-cloudflare-access",
 	],
 	"azuread_group": [
 		"grp-devops", "grp-platform-admins", "grp-regulated-admins", "grp-sandbox-trislab",
