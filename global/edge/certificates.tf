@@ -36,10 +36,12 @@ resource "tls_cert_request" "origin" {
   }
 }
 
+# The hostnames are in the order Cloudflare returns them: a change in the list
+# replaces the certificate.
 resource "cloudflare_origin_ca_certificate" "this" {
   for_each           = local.domains
   csr                = tls_cert_request.origin[each.key].cert_request_pem
-  hostnames          = [each.key, "*.${each.key}"]
+  hostnames          = ["*.${each.key}", each.key]
   request_type       = "origin-rsa"
   requested_validity = 5475
 }
