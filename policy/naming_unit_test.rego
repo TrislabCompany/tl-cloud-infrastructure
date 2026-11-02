@@ -2,7 +2,7 @@ package naming
 
 catalog := {
 	"owners": [
-		{"slug": "website-trislab", "kind": "product", "code": "web", "state": "active"},
+		{"slug": "corporate-site", "kind": "product", "code": "web", "state": "active"},
 		{"slug": "construction", "kind": "product", "code": "con", "state": "active"},
 		{"slug": "okna-capris", "kind": "customer", "code": "oc", "state": "active"},
 		{"slug": "astra-group", "kind": "customer", "code": "asg", "state": "active"},

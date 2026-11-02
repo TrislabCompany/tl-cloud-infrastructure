@@ -5,9 +5,9 @@
 # The rules read only data, so they give the same result for every root. The
 # PR's catalog/ comes as data.pr and main's as data.main (08 section 3). A file
 # that doesn't exist yet passes, and so do the rules that compare the PR with
-# main while main has no catalog/. The rules that need a stamp's stamp.yaml (the stamp
-# folder and its external apps, the default hostname, the sandbox form of a
-# custom hostname, apps[].repo) come with the first stamp template.
+# main while main has no catalog/. Each stamps/<lz>/<folder>/stamp.yaml comes
+# as data.<side>.stamp_yaml["<lz>/<folder>"]. The default hostname rows and the
+# custom hostname rows come before the second stamp (10 section 13).
 package catalog
 
 default owners := []
@@ -38,6 +38,10 @@ default landing_zones := []
 
 landing_zones := data.pr.landing_zones
 
+default stamp_yaml := {}
+
+stamp_yaml := data.pr.stamp_yaml
+
 slug := `^[a-z0-9]+(-[a-z0-9]+)*$`
 
 fqdn := `^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$`
@@ -51,7 +55,7 @@ schemas := {
 		"name": slug, "cloud": `^(azure|gcp)$`, "code": `^[a-z0-9]{2,4}$`, "state": `^(active|retired)$`,
 	}},
 	"repos": {"file": "repos.yaml", "section": 11, "required": {"name", "product", "template", "maintainers", "state"}, "fields": {
-		"name": slug, "product": slug, "customer": slug, "template": `^tl-template-(spa|saas)$`,
+		"name": slug, "product": slug, "customer": slug, "template": `^tl-template-(website|webapp|saas)$`,
 		"maintainers": "array", "state": `^(active|archived)$`, "archived_on": `^[0-9]{4}-[0-9]{2}-[0-9]{2}$`,
 	}},
 	"domains": {"file": "tenants.yaml", "section": 2, "required": {"name", "owner"}, "fields": {
@@ -192,10 +196,13 @@ deny contains msg if {
 
 # ---- repos.yaml (07 section 11) ----
 
+# <customer>-<appType>-<product>, with trislab when there is no customer.
 deny contains msg if {
 	some r in repos
-	r.product != r.name
-	msg := sprintf("catalog/repos.yaml: %v has the product %v; the two must be equal (07 section 11)", [r.name, r.product])
+	is_string(r.template)
+	want := sprintf("%v-%v-%v", [object.get(r, "customer", "trislab"), trim_prefix(r.template, "tl-template-"), r.product])
+	r.name != want
+	msg := sprintf("catalog/repos.yaml: %v must be named %v, from its customer (or trislab), its template and its product (07 section 11)", [r.name, want])
 }
 
 deny contains msg if {
@@ -337,6 +344,36 @@ domain_of(f) := d if {
 in_domain(f, d) if f == d
 
 in_domain(f, d) if endswith(f, concat("", [".", d]))
+
+# ---- stamp.yaml (07 section 7) ----
+
+deny contains msg if {
+	some t in tenants
+	is_string(t.stamp)
+	not stamp_yaml[t.stamp]
+	msg := sprintf("catalog/tenants.yaml: the tenant %v is on %v, which has no stamps/%v/stamp.yaml (07 section 7)", [t.name, t.stamp, t.stamp])
+}
+
+deny contains msg if {
+	some [name, stamp, _, i, h] in hostnames
+	s := stamp_yaml[stamp]
+	is_string(h.app)
+	not external_app(s, h.app)
+	msg := sprintf("catalog/tenants.yaml: hostnames[%d] of %v on %v names the app %v, which is not an app of the stamp with ingress: external (07 section 7)", [i, name, stamp, h.app])
+}
+
+external_app(s, app) if {
+	some a in s.apps
+	a.name == app
+	a.ingress == "external"
+}
+
+deny contains msg if {
+	some stamp, s in stamp_yaml
+	some a in s.apps
+	not a.repo in {r.name | some r in repos; r.state == "active"}
+	msg := sprintf("stamps/%s/stamp.yaml: the app %v deploys from %v, which is not an active repository in catalog/repos.yaml (07 section 7)", [stamp, a.name, a.repo])
+}
 
 # ---- ipam.yaml (07 sections 5 and 6) ----
 
@@ -513,7 +550,58 @@ range_groups contains [[name, c] | some name, c in lz.stamps; cidr(c)] if {
 deny contains msg if {
 	some m in data.main.owners
 	not m.slug in {o.slug | some o in owners}
-	msg := sprintf("catalog/owners.yaml: %v was removed or renamed; an owner is retired with state: retired, never deleted (07 section 9)", [m.slug])
+	not renamed(m)
+	msg := sprintf("catalog/owners.yaml: %v was removed or renamed; an owner is retired with state: retired, never deleted, and its slug changes only while nothing on main references it (07 section 7)", [m.slug])
+}
+
+deny contains msg if {
+	some o in owners
+	not o.slug in {m.slug | some m in data.main.owners}
+	some m in data.main.owners
+	m.code == o.code
+	not m.slug in {x.slug | some x in owners}
+	not renamed(m)
+	msg := sprintf("catalog/owners.yaml: %v takes the code %v of %v on main; a code is never reused (07 section 9)", [o.slug, o.code, m.slug])
+}
+
+# The one exception to "no slug changes": a new slug with main's code, kind and
+# state, while nothing on main references the old one (07 section 7).
+renamed(m) if {
+	some o in owners
+	not o.slug in {x.slug | some x in data.main.owners}
+	[o.code, o.kind, o.state] == [m.code, m.kind, m.state]
+	not referenced_on_main(m)
+}
+
+referenced_on_main(m) if {
+	some s in data.main.stamp_yaml
+	s.product == m.slug
+}
+
+referenced_on_main(m) if {
+	some r in data.main.repos
+	r.product == m.slug
+}
+
+referenced_on_main(m) if {
+	some r in data.main.repos
+	r.customer == m.slug
+}
+
+referenced_on_main(m) if {
+	some t in data.main.tenants
+	t.customer == m.slug
+}
+
+referenced_on_main(m) if {
+	some d in data.main.domains
+	d.owner == m.slug
+}
+
+referenced_on_main(m) if {
+	m.kind == "customer"
+	some lz, _ in data.main.lz_yaml
+	startswith(lz, sprintf("cust-%v-", [m.code]))
 }
 
 deny contains msg if {

@@ -358,10 +358,24 @@ jobs:
           # from which the origin certificates are taken (06 section 2, ADR 0026).
           TF_VAR_ghcr_pull_token: ${{ startsWith(inputs.root, 'stamps/') && secrets.GHCR_PULL_TOKEN || '' }}
           LZ_SECRETS: ${{ startsWith(inputs.root, 'stamps/') && toJSON(secrets) || '' }}
+          DESTROY: ${{ steps.dir.outputs.destroy }}
         run: |
           if [ -n "$LZ_SECRETS" ]; then
             TF_VAR_origin_certs=$(bash main/.github/scripts/stamp-values.sh origin_certs <<< "$LZ_SECRETS")
             export TF_VAR_origin_certs
+            # A plan passes a stand-in for both, which an apply without them would write
+            # to the Key Vault (aca-app, blocks/kv-secret-access).
+            if [ "$DESTROY" != true ]; then
+              if [ -z "$TF_VAR_ghcr_pull_token" ]; then
+                echo "::error::GHCR_PULL_TOKEN is missing in $ENVIRONMENT; the landing zone's apply copies it (06 section 6.3)"; exit 1
+              fi
+              versions=${TF_VAR_origin_cert_versions:-}
+              [ -n "$versions" ] || versions='{}'
+              missing=$(jq -rn --argjson v "$versions" --argjson c "$TF_VAR_origin_certs" '$v | keys - ($c | keys) | join(", ")')
+              if [ -n "$missing" ]; then
+                echo "::error::$ENVIRONMENT has ORIGIN_CERT_<ZONE>_VERSION but no secret ORIGIN_CERT_<ZONE> for: $missing (ADR 0027)"; exit 1
+              fi
+            fi
           fi
           unset LZ_SECRETS
           set +e
