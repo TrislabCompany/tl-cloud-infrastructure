@@ -13,4 +13,9 @@ domains:
   - name: spds.si
     owner: spds
 
-tenants: []
+tenants:
+  - name: corporate-site
+    customer: trislab
+    stamp: products-sandbox-neu/corporate-site-staging
+    hostnames:
+      - { fqdn: staging-corporate-site.trislab.com, app: web }

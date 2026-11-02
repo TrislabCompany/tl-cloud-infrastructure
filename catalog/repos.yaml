@@ -1,0 +1,9 @@
+# App repositories (07 section 11). global/github creates each active entry
+# from its template (ADR 0038). An entry is never deleted: state: archived
+# archives the repository, so the name is never reused.
+repos:
+  - name: trislab-website-corporate-site
+    product: corporate-site
+    template: tl-template-website
+    maintainers: [tl-janskof]
+    state: active

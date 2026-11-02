@@ -17,3 +17,5 @@ hubs:
 landing_zones:
   - name: products-sandbox-neu
     cidr: 10.32.0.0/20
+    stamps:
+      corporate-site-staging: 10.32.0.0/27
