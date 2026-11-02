@@ -263,15 +263,19 @@ jobs:
             echo TF_ENCRYPTION_END
           } >> "$GITHUB_ENV"
 
-      - name: Sign in as tl-landingzones-apply
+      - name: Sign in as the root's GitHub App
         id: app
-        # The github provider of landing-zones/_root writes the lz-<lz> Environments (ADR 0019).
-        if: inputs.root == 'landing-zones/_root'
+        # tl-landingzones-apply: landing-zones/_root writes the lz-<lz> Environments and gets
+        # GHCR_PULL_TOKEN copied in (ADR 0019, ADR 0026). tl-global-apply: global/edge writes the
+        # origin certificates into them (ADR 0026). tl-github-apply: global/github creates the
+        # organization's app repositories, so its token isn't limited to this one (ADR 0038).
+        if: inputs.root == 'landing-zones/_root' || inputs.root == 'global/edge' || inputs.root == 'global/github'
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          client-id: ${{ vars.LZ_APP_ID }}
-          private-key: ${{ secrets.LZ_APP_KEY }}
-          repositories: ${{ github.event.repository.name }}
+          client-id: ${{ inputs.root == 'global/edge' && vars.GLOBAL_APP_ID || inputs.root == 'global/github' && vars.GH_APP_ID || vars.LZ_APP_ID }}
+          private-key: ${{ inputs.root == 'global/edge' && secrets.GLOBAL_APP_KEY || inputs.root == 'global/github' && secrets.GH_APP_KEY || secrets.LZ_APP_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ inputs.root != 'global/github' && github.event.repository.name || '' }}
 
       - name: Set the Azure environment
         env:
@@ -287,7 +291,16 @@ jobs:
           AZ_BILLING_ACCOUNT: ${{ vars.AZ_BILLING_ACCOUNT }}
           AZ_BILLING_PROFILE: ${{ vars.AZ_BILLING_PROFILE }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          # Stamps only: the variables of lz-<lz>, the Environment this job runs in.
+          LZ_VARS: ${{ startsWith(inputs.root, 'stamps/') && toJSON(vars) || '' }}
         run: |
+          if [ -n "$LZ_VARS" ]; then
+            # The stamp values of 08 section 2, built as shared-plan.yml builds them.
+            data_access=$(bash main/.github/scripts/stamp-values.sh data_access <<< "$LZ_VARS")
+            app_repo_ids=$(bash main/.github/scripts/stamp-values.sh app_repo_ids <<< "$LZ_VARS")
+            origin_cert_versions=$(bash main/.github/scripts/stamp-values.sh origin_cert_versions <<< "$LZ_VARS")
+            ghcr_pull_token_version=$(jq -r '.GHCR_PULL_TOKEN_VERSION // ""' <<< "$LZ_VARS")
+          fi
           {
             echo "ARM_CLIENT_ID=$CLIENT_ID"; echo "ARM_SUBSCRIPTION_ID=$SUBSCRIPTION_ID"; echo "ARM_TENANT_ID=$TENANT_ID"
             echo "ARM_USE_OIDC=true"; echo "ARM_STORAGE_USE_AZUREAD=true"; echo "TF_VAR_landing_zone=$KEY"
@@ -296,6 +309,10 @@ jobs:
             echo "TF_VAR_github_owner_id=$OWNER_ID"; echo "TF_VAR_github_repository_id=$REPOSITORY_ID"
             echo "TF_VAR_az_billing_account=$AZ_BILLING_ACCOUNT"; echo "TF_VAR_az_billing_profile=$AZ_BILLING_PROFILE"
             echo "TF_VAR_cloudflare_account_id=$CLOUDFLARE_ACCOUNT_ID"
+            if [ -n "$LZ_VARS" ]; then
+              echo "TF_VAR_data_access=$data_access"; echo "TF_VAR_app_repo_ids=$app_repo_ids"
+              echo "TF_VAR_origin_cert_versions=$origin_cert_versions"; echo "TF_VAR_ghcr_pull_token_version=$ghcr_pull_token_version"
+            fi
           } >> "$GITHUB_ENV"
 
       - name: Find the saved plan or a new root
@@ -330,15 +347,23 @@ jobs:
 
       - name: tofu apply
         env:
-          # landing-zones/_root only: the github provider's token, and the ephemeral GHCR pull
-          # token it copies into each lz-<lz>, given again at apply (ADR 0019, ADR 0026).
+          # landing-zones/_root, global/edge and global/github: the github provider's token
+          # (08 section 2, Provider credentials).
           GITHUB_TOKEN: ${{ steps.app.outputs.token }}
-          GITHUB_OWNER: ${{ inputs.root == 'landing-zones/_root' && github.repository_owner || '' }}
-          TF_VAR_ghcr_pull_token: ${{ inputs.root == 'landing-zones/_root' && secrets.GHCR_PULL_TOKEN || '' }}
+          GITHUB_OWNER: ${{ steps.app.outputs.token && github.repository_owner || '' }}
           # global/edge only: the cloudflare provider's edit token of the Environment global,
           # never in $GITHUB_ENV (16 section 7).
           CLOUDFLARE_API_TOKEN: ${{ inputs.root == 'global/edge' && secrets.CLOUDFLARE_API_TOKEN || '' }}
+          # Stamps only, both ephemeral inputs: the GHCR pull token of lz-<lz>, and its secrets,
+          # from which the origin certificates are taken (06 section 2, ADR 0026).
+          TF_VAR_ghcr_pull_token: ${{ startsWith(inputs.root, 'stamps/') && secrets.GHCR_PULL_TOKEN || '' }}
+          LZ_SECRETS: ${{ startsWith(inputs.root, 'stamps/') && toJSON(secrets) || '' }}
         run: |
+          if [ -n "$LZ_SECRETS" ]; then
+            TF_VAR_origin_certs=$(bash main/.github/scripts/stamp-values.sh origin_certs <<< "$LZ_SECRETS")
+            export TF_VAR_origin_certs
+          fi
+          unset LZ_SECRETS
           set +e
           tofu -chdir="${{ steps.dir.outputs.path }}" apply -input=false -no-color "$RUNNER_TEMP/plan/tfplan" 2>&1 | tee "$RUNNER_TEMP/apply.log"
           code=${PIPESTATUS[0]}
@@ -350,15 +375,41 @@ jobs:
             exit "$code"
           fi
 
+      - name: Copy the GHCR pull token into lz-<lz>
+        if: inputs.root == 'landing-zones/_root'
+        env:
+          # The token of tl-landingzones-apply, which has Secrets read and write (ADR 0019).
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          # The secret of the Environment landingzones, this job's Environment (ADR 0026).
+          GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+        run: |
+          # The token never goes through OpenTofu, so it is in no plan and no state. It goes to gh on
+          # its input, never as an argument, and is never printed (08 section 2).
+          if [ -z "$GHCR_PULL_TOKEN" ]; then
+            echo "::error::GHCR_PULL_TOKEN is missing in the Environment landingzones (16 section 13.5)"; exit 1
+          fi
+          # A landing zone whose apply removed its Environment (decommissioned or deleted) gets nothing.
+          if ! gh api "repos/$GH_REPO/environments/lz-$KEY" --silent 2> /dev/null; then
+            echo "::notice::lz-$KEY doesn't exist after the apply, so GHCR_PULL_TOKEN isn't copied"; exit 0
+          fi
+          printf '%s' "$GHCR_PULL_TOKEN" | gh secret set GHCR_PULL_TOKEN --env "lz-$KEY" --repo "$GH_REPO"
+          echo "Copied GHCR_PULL_TOKEN into lz-$KEY"
+
       - name: Check that nothing is left to apply
         env:
           # As in tofu apply.
           GITHUB_TOKEN: ${{ steps.app.outputs.token }}
-          GITHUB_OWNER: ${{ inputs.root == 'landing-zones/_root' && github.repository_owner || '' }}
-          TF_VAR_ghcr_pull_token: ${{ inputs.root == 'landing-zones/_root' && secrets.GHCR_PULL_TOKEN || '' }}
+          GITHUB_OWNER: ${{ steps.app.outputs.token && github.repository_owner || '' }}
           CLOUDFLARE_API_TOKEN: ${{ inputs.root == 'global/edge' && secrets.CLOUDFLARE_API_TOKEN || '' }}
+          TF_VAR_ghcr_pull_token: ${{ startsWith(inputs.root, 'stamps/') && secrets.GHCR_PULL_TOKEN || '' }}
+          LZ_SECRETS: ${{ startsWith(inputs.root, 'stamps/') && toJSON(secrets) || '' }}
           DESTROY: ${{ steps.dir.outputs.destroy }}
         run: |
+          if [ -n "$LZ_SECRETS" ]; then
+            TF_VAR_origin_certs=$(bash main/.github/scripts/stamp-values.sh origin_certs <<< "$LZ_SECRETS")
+            export TF_VAR_origin_certs
+          fi
+          unset LZ_SECRETS
           # `applied` is green only when a final plan of each root shows no changes (08 section 4).
           args=(-input=false -no-color -detailed-exitcode)
           if [ "$DESTROY" = true ]; then args+=(-destroy); fi

@@ -120,15 +120,19 @@ jobs:
           mapfile -t files < <(find . -path ./.git -prune -o -path '*/.terraform' -prune -o \( -name '*.tf' -o -name '*.tofu' \) -print)
           conftest test --no-color --parser hcl2 --policy "$GITHUB_WORKSPACE/main/policy" --namespace trusted_code "${files[@]}"
 
-      - name: Sign in as tl-landingzones-plan
+      - name: Sign in as tl-landingzones-plan or tl-github-plan
         id: app
-        # Stamps read lz-<lz> with it; landing-zones/_root's github provider reads the Environments (ADR 0019).
-        if: steps.layer.outputs.layer == 'stamps' || steps.layer.outputs.layer == 'landingzones'
+        # tl-landingzones-plan: stamps read lz-<lz> with it, and the github providers of
+        # landing-zones/_root and global/edge read the Environments (ADR 0019, ADR 0026).
+        # tl-github-plan: the github provider of global/github reads the organization's
+        # repositories, so its token isn't limited to this one (ADR 0038).
+        if: contains(fromJSON('["stamps","landingzones"]'), steps.layer.outputs.layer) || inputs.root == 'global/edge' || inputs.root == 'global/github'
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          client-id: ${{ vars.LZ_PLAN_APP_ID }}
-          private-key: ${{ secrets.LZ_PLAN_APP_KEY }}
-          repositories: ${{ github.event.repository.name }}
+          client-id: ${{ inputs.root == 'global/github' && vars.GH_PLAN_APP_ID || vars.LZ_PLAN_APP_ID }}
+          private-key: ${{ inputs.root == 'global/github' && secrets.GH_PLAN_APP_KEY || secrets.LZ_PLAN_APP_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ inputs.root != 'global/github' && github.event.repository.name || '' }}
 
       - name: Read the landing zone's Environment
         id: lz
@@ -143,8 +147,20 @@ jobs:
           if [ -z "$client_id" ]; then
             echo "::error::landing zone \`$LZ\` has no Environment yet: apply its \`lz.yaml\` first"; exit 1
           fi
-          echo "client_id=$client_id" >> "$GITHUB_OUTPUT"
-          echo "subscription_id=$(read_var AZURE_SUBSCRIPTION_ID)" >> "$GITHUB_OUTPUT"
+          # The stamp values of 08 section 2, as shared-apply.yml builds them from the Environment.
+          gh api "repos/$GH_REPO/environments/lz-$LZ/variables?per_page=30" --paginate --jq '.variables[]' \
+            | jq -s 'map({(.name): .value}) | add // {}' > "$RUNNER_TEMP/lz-vars.json"
+          values=$RUNNER_TEMP/lz-vars.json
+          subscription_id=$(jq -r '.AZURE_SUBSCRIPTION_ID // ""' "$values")
+          data_access=$(bash main/.github/scripts/stamp-values.sh data_access < "$values")
+          app_repo_ids=$(bash main/.github/scripts/stamp-values.sh app_repo_ids < "$values")
+          origin_cert_versions=$(bash main/.github/scripts/stamp-values.sh origin_cert_versions < "$values")
+          ghcr_pull_token_version=$(jq -r '.GHCR_PULL_TOKEN_VERSION // ""' "$values")
+          {
+            echo "client_id=$client_id"; echo "subscription_id=$subscription_id"
+            echo "data_access=$data_access"; echo "app_repo_ids=$app_repo_ids"
+            echo "origin_cert_versions=$origin_cert_versions"; echo "ghcr_pull_token_version=$ghcr_pull_token_version"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Find the plan identity
         id: identity
@@ -322,12 +338,18 @@ jobs:
           TF_VAR_az_billing_account: ${{ vars.AZ_BILLING_ACCOUNT }}
           TF_VAR_az_billing_profile: ${{ vars.AZ_BILLING_PROFILE }}
           TF_VAR_cloudflare_account_id: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          # Stamps only: the values of lz-<lz>. Plans get no origin certificate and no GHCR
+          # pull token, only their versions (08 section 2, ADR 0026).
+          TF_VAR_data_access: ${{ steps.lz.outputs.data_access }}
+          TF_VAR_app_repo_ids: ${{ steps.lz.outputs.app_repo_ids }}
+          TF_VAR_origin_cert_versions: ${{ steps.lz.outputs.origin_cert_versions }}
+          TF_VAR_ghcr_pull_token_version: ${{ steps.lz.outputs.ghcr_pull_token_version }}
           # global/edge only: the cloudflare provider's read-only token (16 section 7).
           CLOUDFLARE_API_TOKEN: ${{ inputs.root == 'global/edge' && secrets.CLOUDFLARE_API_TOKEN_PLAN || '' }}
-          # The github provider of landing-zones/_root, read-only on plan. Plans get no
-          # GHCR pull token (ADR 0026).
-          GITHUB_TOKEN: ${{ steps.layer.outputs.layer == 'landingzones' && steps.app.outputs.token || '' }}
-          GITHUB_OWNER: ${{ steps.layer.outputs.layer == 'landingzones' && github.repository_owner || '' }}
+          # The github provider of landing-zones/_root, global/edge and global/github, read-only
+          # on plan (08 section 2, Provider credentials). Stamps have none.
+          GITHUB_TOKEN: ${{ steps.layer.outputs.layer != 'stamps' && steps.app.outputs.token || '' }}
+          GITHUB_OWNER: ${{ steps.layer.outputs.layer != 'stamps' && steps.app.outputs.token && github.repository_owner || '' }}
           DESTROY: ${{ steps.dir.outputs.destroy }}
         run: |
           # Plans take no state lock: a plan identity can't write the lock blob (08 section 7).
@@ -349,8 +371,9 @@ jobs:
         working-directory: ${{ steps.dir.outputs.path }}
         run: |
           # main's rules, with the PR's catalog/ as data.pr and main's as data.main,
-          # so the rules can compare the two, and each landing-zones/<lz>.yaml as
-          # data.<side>.lz_yaml["<lz>"] (08 section 3, Checks on every plan).
+          # so the rules can compare the two, each landing-zones/<lz>.yaml as
+          # data.<side>.lz_yaml["<lz>"] and each stamps/<lz>/<folder>/stamp.yaml as
+          # data.<side>.stamp_yaml["<lz>/<folder>"] (08 section 3, Checks on every plan).
           tofu show -json tfplan > "$RUNNER_TEMP/plan.json"
           mkdir -p "$RUNNER_TEMP/catalog"
           for side in pr:src main:main; do
@@ -363,6 +386,12 @@ jobs:
               lz=$(basename "$f" .yaml)
               [[ "$lz" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || { echo "::error::landing-zones/$lz.yaml is not a landing zone name"; exit 1; }
               yq -o=json "{\"${side%%:*}\": {\"lz_yaml\": {\"$lz\": .}}}" "$f" > "$RUNNER_TEMP/catalog/${side%%:*}-lz-$lz.json"
+            done
+            for f in "$GITHUB_WORKSPACE/${side#*:}/stamps/"*/*/stamp.yaml; do
+              [ -e "$f" ] || continue
+              stamp=$(basename "$(dirname "$(dirname "$f")")")/$(basename "$(dirname "$f")")
+              [[ "$stamp" =~ ^[a-z0-9]+(-[a-z0-9]+)*/[a-z0-9]+(-[a-z0-9]+)*$ ]] || { echo "::error::stamps/$stamp is not a stamp folder name"; exit 1; }
+              yq -o=json "{\"${side%%:*}\": {\"stamp_yaml\": {\"$stamp\": .}}}" "$f" > "$RUNNER_TEMP/catalog/${side%%:*}-stamp-${stamp/\//--}.json"
             done
           done
           set +e

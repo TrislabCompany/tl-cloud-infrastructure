@@ -127,6 +127,9 @@ def changed_roots(base, head):
                 roots |= {(s, None) for s in stamps_of(both, lz)}
         elif parts[0] == "landing-zones" and parts[1] == "_root":
             roots |= {("landing-zones/_root", lz) for lz in landing_zones(both)}
+            # A new GHCR pull token version reaches every stamp in the same PR (ADR 0026).
+            if f == "landing-zones/_root/ghcr.tf":
+                roots |= {(s, None) for s in folders(both, "stamps/", 2)}
         elif parts[0] == "stamps" and len(parts) > 3:
             roots.add(("/".join(parts[:3]), None))
             if parts[3] == "stamp.yaml":
@@ -134,6 +137,11 @@ def changed_roots(base, head):
                 pick = lambda d: (d.get("apps"), d.get("app_environment"))
                 if old is None or new is None or pick(old) != pick(new):
                     roots.add(("global/github", None))
+                # global/edge derives the hostnames from the apps (ADR 0027).
+                if old is None or new is None or old.get("apps") != new.get("apps"):
+                    roots.add(("global/edge", None))
+        elif f == "catalog/cloudflare-ips.yaml":
+            roots |= {(s, None) for s in folders(both, "stamps/", 2)}
         elif f == "catalog/tenants.yaml":
             roots.add(("global/edge", None))
             def tenants(doc):
