@@ -160,3 +160,15 @@ resource "cloudflare_dns_record" "asuid" {
   proxied  = false
   ttl      = 3600
 }
+
+# The hostnames whose records exist, by landing zone. A stamp binds only these:
+# it looks up no DNS itself (ADR 0027, Technical details, Binding).
+resource "github_actions_environment_variable" "edge_hostnames" {
+  for_each      = toset([for h in local.live_hostnames : h.lz])
+  repository    = "tl-cloud-infrastructure"
+  environment   = "lz-${each.key}"
+  variable_name = "EDGE_HOSTNAMES"
+  value         = jsonencode(sort([for fqdn, h in local.live_hostnames : fqdn if h.lz == each.key]))
+
+  depends_on = [cloudflare_dns_record.stamp, cloudflare_dns_record.asuid]
+}
