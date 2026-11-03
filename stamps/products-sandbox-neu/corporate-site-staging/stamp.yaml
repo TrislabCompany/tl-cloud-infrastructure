@@ -1,6 +1,6 @@
 # stamps/products-sandbox-neu/corporate-site-staging/stamp.yaml
 template: aca-app
-version: v1.0.0
+version: v1.0.1
 lz: products-sandbox-neu
 product: corporate-site
 environment: staging

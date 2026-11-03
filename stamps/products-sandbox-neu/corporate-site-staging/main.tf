@@ -33,6 +33,10 @@ variable "origin_cert_versions" { # from ORIGIN_CERT_<ZONE>_VERSION in lz-produc
   type    = map(number)
   default = {}
 }
+variable "edge_hostnames" { # from EDGE_HOSTNAMES in lz-products-sandbox-neu
+  type    = list(string)
+  default = []
+}
 variable "origin_certs" { # from the secrets ORIGIN_CERT_<ZONE> in lz-products-sandbox-neu, apply only
   type      = map(string)
   default   = {}
@@ -51,7 +55,7 @@ variable "ghcr_pull_token" { # from the secret GHCR_PULL_TOKEN in lz-products-sa
 }
 
 module "stamp" {
-  source = "git::https://github.com/TrislabCompany/tl-platform.git//stamps/aca-app?ref=aca-app/v1.0.0"
+  source = "git::https://github.com/TrislabCompany/tl-platform.git//stamps/aca-app?ref=aca-app/v1.0.1"
   config = yamldecode(file("${path.module}/stamp.yaml"))
   lz     = yamldecode(file("${path.root}/../../../landing-zones/products-sandbox-neu.yaml"))
   tenants = [for t in yamldecode(file("${path.root}/../../../catalog/tenants.yaml")).tenants : t
@@ -61,6 +65,7 @@ module "stamp" {
   github_owner_id         = var.github_owner_id
   app_repo_ids            = var.app_repo_ids
   origin_cert_versions    = var.origin_cert_versions
+  edge_hostnames          = var.edge_hostnames
   origin_certs            = var.origin_certs
   ghcr_pull_token_version = var.ghcr_pull_token_version
   ghcr_pull_token         = var.ghcr_pull_token
