@@ -34,3 +34,19 @@ resource "azurerm_role_definition" "edge_stamp_reader" {
     ]
   }
 }
+
+# Lets a landing zone's plan identity refresh container apps: azurerm lists an
+# app's secrets on every read. They are Key Vault references only, so the list
+# holds no value (ADR 0024).
+resource "azurerm_role_definition" "stamp_plan_reader" {
+  name              = "Stamp plan reader"
+  description       = "List container apps' secrets only, which are Key Vault references (ADR 0024)."
+  scope             = azurerm_management_group.landingzones.id
+  assignable_scopes = [azurerm_management_group.landingzones.id]
+
+  permissions {
+    actions = [
+      "Microsoft.App/containerApps/listSecrets/action",
+    ]
+  }
+}
