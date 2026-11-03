@@ -2,7 +2,7 @@
 # onboards the customer or product, and never deleted: offboarding sets
 # state: retired, so the code is never reused.
 owners:
-  - slug: website-trislab
+  - slug: corporate-site
     kind: product
     code: web
     state: active
