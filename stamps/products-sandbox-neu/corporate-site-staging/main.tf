@@ -55,7 +55,7 @@ variable "ghcr_pull_token" { # from the secret GHCR_PULL_TOKEN in lz-products-sa
 }
 
 module "stamp" {
-  source = "git::https://github.com/TrislabCompany/tl-platform.git//stamps/aca-app?ref=aca-app/v1.0.2"
+  source = "git::https://github.com/TrislabCompany/tl-platform.git//stamps/aca-app?ref=aca-app/v1.0.3"
   config = yamldecode(file("${path.module}/stamp.yaml"))
   lz     = yamldecode(file("${path.root}/../../../landing-zones/products-sandbox-neu.yaml"))
   tenants = [for t in yamldecode(file("${path.root}/../../../catalog/tenants.yaml")).tenants : t
