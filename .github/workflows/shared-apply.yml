@@ -299,6 +299,7 @@ jobs:
             data_access=$(bash main/.github/scripts/stamp-values.sh data_access <<< "$LZ_VARS")
             app_repo_ids=$(bash main/.github/scripts/stamp-values.sh app_repo_ids <<< "$LZ_VARS")
             origin_cert_versions=$(bash main/.github/scripts/stamp-values.sh origin_cert_versions <<< "$LZ_VARS")
+            edge_hostnames=$(bash main/.github/scripts/stamp-values.sh edge_hostnames <<< "$LZ_VARS")
             ghcr_pull_token_version=$(jq -r '.GHCR_PULL_TOKEN_VERSION // ""' <<< "$LZ_VARS")
           fi
           {
@@ -312,6 +313,7 @@ jobs:
             if [ -n "$LZ_VARS" ]; then
               echo "TF_VAR_data_access=$data_access"; echo "TF_VAR_app_repo_ids=$app_repo_ids"
               echo "TF_VAR_origin_cert_versions=$origin_cert_versions"; echo "TF_VAR_ghcr_pull_token_version=$ghcr_pull_token_version"
+              echo "TF_VAR_edge_hostnames=$edge_hostnames"
             fi
           } >> "$GITHUB_ENV"
 
