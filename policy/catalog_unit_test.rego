@@ -23,7 +23,7 @@ good := {
 		{"name": "okna-capris-webapp-construction", "product": "construction", "customer": "okna-capris", "template": "tl-template-webapp", "maintainers": ["octo-marko"], "state": "archived", "archived_on": "2026-09-01"},
 	],
 	"domains": [
-		{"name": "trislab.com", "owner": "trislab"},
+		{"name": "trislab.com", "owner": "trislab", "redirects": [{"from": "www.trislab.com", "to": "trislab.com"}]},
 		{"name": "construction.com", "owner": "trislab"},
 		{"name": "astra-group.example", "owner": "astra-group"},
 	],
@@ -31,7 +31,6 @@ good := {
 		{"name": "corporate-site", "customer": "trislab", "stamp": "products-prod-neu/corporate-site", "hostnames": [
 			{"fqdn": "prod-corporate-site.trislab.com", "app": "web"},
 			{"fqdn": "trislab.com", "app": "web"},
-			{"fqdn": "www.trislab.com", "app": "web"},
 		]},
 		{"name": "construction", "customer": "trislab", "stamp": "products-prod-neu/construction-shared-01", "hostnames": [
 			{"fqdn": "prod-construction-01.trislab.com", "app": "web"},
@@ -509,4 +508,39 @@ test_cancelled_stays_cancelled if {
 	main := {"lz_yaml": {"exp-aks": decommissioned("exp-aks", "2020-01-01", {"state": "cancelled"})}}
 	some msg in compared({"lz_yaml": {"exp-aks": decommissioned("exp-aks", "2020-01-01", {})}}, main)
 	contains(msg, "it was cancelled on main and stays cancelled")
+}
+
+test_redirect_in_the_domain_is_allowed if {
+	count(denied(good)) == 0
+}
+
+test_redirect_with_an_unknown_field_is_denied if {
+	d := [{"name": "trislab.com", "owner": "trislab", "redirects": [{"from": "www.trislab.com", "to": "trislab.com", "code": 302}]}]
+	denies(with_list("domains", d), "must be { from, to }")
+}
+
+test_redirect_outside_the_domain_is_denied if {
+	d := [{"name": "trislab.com", "owner": "trislab", "redirects": [{"from": "www.trislab.com", "to": "construction.com"}]}]
+	denies(with_list("domains", array.concat(d, [{"name": "construction.com", "owner": "trislab"}])), "is not trislab.com or one label below it")
+}
+
+test_redirect_to_itself_is_denied if {
+	d := [{"name": "trislab.com", "owner": "trislab", "redirects": [{"from": "www.trislab.com", "to": "www.trislab.com"}]}]
+	denies(with_list("domains", d), "goes to itself")
+}
+
+test_redirect_source_of_a_stamp_is_denied if {
+	d := [{"name": "trislab.com", "owner": "trislab", "redirects": [{"from": "prod-corporate-site.trislab.com", "to": "trislab.com"}]}]
+	denies(with_list("domains", d), "is also a hostname of a stamp")
+}
+
+test_repeated_redirect_source_is_denied if {
+	d := [{"name": "trislab.com", "owner": "trislab", "redirects": [{"from": "www.trislab.com", "to": "trislab.com"}, {"from": "www.trislab.com", "to": "trislab.com"}]}]
+	denies(with_list("domains", d), "is used more than once")
+}
+
+test_more_than_ten_redirects_is_denied if {
+	rs := [{"from": sprintf("a%d.trislab.com", [i]), "to": "trislab.com"} | some i in numbers.range(1, 11)]
+	d := [{"name": "trislab.com", "owner": "trislab", "redirects": rs}]
+	denies(with_list("domains", d), "more than 10 redirects")
 }
