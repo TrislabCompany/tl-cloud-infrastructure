@@ -59,7 +59,7 @@ schemas := {
 		"maintainers": "array", "state": `^(active|archived)$`, "archived_on": `^[0-9]{4}-[0-9]{2}-[0-9]{2}$`,
 	}},
 	"domains": {"file": "tenants.yaml", "section": 2, "required": {"name", "owner"}, "fields": {
-		"name": fqdn, "owner": slug,
+		"name": fqdn, "owner": slug, "redirects": "array",
 	}},
 	"tenants": {"file": "tenants.yaml", "section": 2, "required": {"name", "customer", "stamp"}, "fields": {
 		"name": `^[a-z0-9-]{1,40}$`, "customer": slug, "stamp": `^[a-z0-9-]+/[a-z0-9-]+$`, "hostnames": "array",
@@ -321,6 +321,75 @@ deny contains msg if {
 	owner := {x.owner | some x in domains; x.name == d}
 	count(owner & {customer, "trislab"}) == 0
 	msg := sprintf("catalog/tenants.yaml: the hostname %v of %v on %v is in %v, which belongs to another customer (07 section 3.2)", [h.fqdn, name, stamp, d])
+}
+
+# ---- domains[].redirects (07 section 2.1.1) ----
+
+# [domain, i, redirect] for every redirect.
+redirects contains [d.name, i, r] if {
+	some d in domains
+	is_array(d.redirects)
+	some i, r in d.redirects
+}
+
+valid_redirect(r) if {
+	is_object(r)
+	object.keys(r) == {"from", "to"}
+	is_string(r.from)
+	regex.match(fqdn, r.from)
+	is_string(r.to)
+	regex.match(fqdn, r.to)
+}
+
+deny contains msg if {
+	some [name, i, r] in redirects
+	not valid_redirect(r)
+	msg := sprintf("catalog/tenants.yaml: redirects[%d] of %v must be { from, to } with lowercase FQDNs (07 section 2.1.1)", [i, name])
+}
+
+# Both names are the domain or one label below it.
+deny contains msg if {
+	some [name, _, r] in redirects
+	valid_redirect(r)
+	some h in [r.from, r.to]
+	not redirect_name_in(h, name)
+	msg := sprintf("catalog/tenants.yaml: the redirect name %v is not %v or one label below it (07 section 2.1.1)", [h, name])
+}
+
+redirect_name_in(h, d) if h == d
+
+redirect_name_in(h, d) if {
+	endswith(h, concat("", [".", d]))
+	not contains(trim_suffix(h, concat("", [".", d])), ".")
+}
+
+deny contains msg if {
+	some [name, _, r] in redirects
+	valid_redirect(r)
+	r.from == r.to
+	msg := sprintf("catalog/tenants.yaml: the redirect of %v in %v goes to itself (07 section 2.1.1)", [r.from, name])
+}
+
+all_redirect_sources := [r.from | some [_, _, r] in redirects; valid_redirect(r)]
+
+deny contains msg if {
+	some f in {f | some f in all_redirect_sources}
+	count([x | some x in all_redirect_sources; x == f]) > 1
+	msg := sprintf("catalog/tenants.yaml: the redirect source %v is used more than once (07 section 2.1.1)", [f])
+}
+
+deny contains msg if {
+	some f in all_redirect_sources
+	f in all_fqdns
+	msg := sprintf("catalog/tenants.yaml: the redirect source %v is also a hostname of a stamp (07 section 2.1.1)", [f])
+}
+
+# The Free plan allows 10 Single Redirects rules per zone.
+deny contains msg if {
+	some d in domains
+	is_array(d.redirects)
+	count(d.redirects) > 10
+	msg := sprintf("catalog/tenants.yaml: the domain %v has more than 10 redirects, the Free plan's limit per zone (07 section 2.1.1)", [d.name])
 }
 
 # At most one label below its domain, so the universal certificate covers it.
