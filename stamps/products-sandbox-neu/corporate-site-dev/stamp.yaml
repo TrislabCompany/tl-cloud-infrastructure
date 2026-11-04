@@ -1,0 +1,16 @@
+# stamps/products-sandbox-neu/corporate-site-dev/stamp.yaml
+template: aca-app
+version: v1.0.3
+lz: products-sandbox-neu
+product: corporate-site
+environment: dev
+tenancy: dedicated
+network:
+  subnet_cidr: 10.32.0.32/27
+apps:
+  - name: web
+    repo: trislab-website-corporate-site
+    profile: Consumption
+    ingress: external
+    port: 8080
+    caps: { cpu: 0.5, memory: 1Gi, max_replicas: 2 }

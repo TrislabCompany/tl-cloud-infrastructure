@@ -19,3 +19,4 @@ landing_zones:
     cidr: 10.32.0.0/20
     stamps:
       corporate-site-staging: 10.32.0.0/27
+      corporate-site-dev: 10.32.0.32/27
