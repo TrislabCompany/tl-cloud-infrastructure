@@ -21,3 +21,8 @@ tenants:
     stamp: products-sandbox-neu/corporate-site-staging
     hostnames:
       - { fqdn: staging-corporate-site.trislab.com, app: web }
+  - name: corporate-site
+    customer: trislab
+    stamp: products-sandbox-neu/corporate-site-dev
+    hostnames:
+      - { fqdn: dev-corporate-site.trislab.com, app: web }
