@@ -56,7 +56,7 @@ tofu -chdir=<root> init -backend=false; tofu -chdir=<root> validate   # each cha
 
 ## Update a PR
 
-- To take `main`'s changes, `git fetch origin; git rebase origin/main`, then the diff check above, then `git push --force-with-lease`.
+- To take `main`'s changes, `git fetch origin; git rebase origin/main`, then the diff check above, then `git push --force-with-lease origin <branch>`. Name the remote and the branch: a bare push does nothing when the local branch has no upstream, as after `git switch -C`. Then check that `git rev-parse HEAD origin/<branch>` prints the same commit twice.
 - When part of a PR moves to another PR, rebuild the branch instead of adding a commit that takes the part out: `git switch -C <branch> origin/main; git checkout <old head> -- <this PR's files>`, then commit. Once the other PR is merged, a commit that took its files out undoes it on `main`, and the next `/apply` destroys what it created.
 
 ## 5. Commit, push, open the PR
