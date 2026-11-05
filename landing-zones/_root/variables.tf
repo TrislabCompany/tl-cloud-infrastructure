@@ -57,3 +57,13 @@ variable "az_billing_profile" {
     error_message = "az_billing_profile is empty. Is the repository variable AZ_BILLING_PROFILE set?"
   }
 }
+
+variable "alert_email_platform" {
+  description = "The platform team's shared mailbox, from the repository variable ALERT_EMAIL_PLATFORM, which the action group of a prod landing zone e-mails (alerts.tf)."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[^@ ]+@[^@ ]+[.][^@ ]+$", var.alert_email_platform))
+    error_message = "alert_email_platform must be an e-mail address. Is the repository variable ALERT_EMAIL_PLATFORM set?"
+  }
+}
