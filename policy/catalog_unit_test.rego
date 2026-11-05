@@ -557,3 +557,33 @@ test_more_than_ten_redirects_is_denied if {
 	d := [{"name": "trislab.com", "owner": "trislab", "redirects": rs}]
 	denies(with_list("domains", d), "more than 10 redirects")
 }
+
+group_change(name, actions) := {"resource_changes": [{
+	"address": "azuread_group.this[\"x\"]",
+	"mode": "managed",
+	"type": "azuread_group",
+	"change": {"actions": actions, "before": {"display_name": name}, "after": null},
+}]}
+
+# Only this rule's messages: a bare lz.yaml trips the other landing zone rules.
+group_denied(name, actions, state) := {msg |
+	some msg in deny with input as group_change(name, actions) with data.pr as {"lz_yaml": {"products-prod-neu": lz("products-prod-neu", {"state": state})}}
+	contains(msg, "is a data access group")
+}
+
+test_data_group_of_an_active_landing_zone_is_kept if {
+	some msg in group_denied("grp-data-products-prod-neu-readers", ["delete"], "active")
+	contains(msg, "stays until the landing zone is cancelled")
+	some msg2 in group_denied("grp-data-products-prod-neu-admins", ["delete", "create"], "decommissioned")
+	contains(msg2, "decommissioned")
+}
+
+test_data_group_of_a_cancelled_landing_zone_can_go if {
+	count(group_denied("grp-data-products-prod-neu-readers", ["delete"], "cancelled")) == 0
+}
+
+test_data_group_create_and_other_groups_pass if {
+	count(group_denied("grp-data-products-prod-neu-readers", ["create"], "active")) == 0
+	count(group_denied("grp-data-cust-oc-prod-neu-admins", ["delete"], "active")) == 0
+	count(group_denied("grp-devops", ["delete"], "active")) == 0
+}
