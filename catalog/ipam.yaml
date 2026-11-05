@@ -22,3 +22,5 @@ landing_zones:
       corporate-site-dev: 10.32.0.32/27
   - name: products-prod-neu
     cidr: 10.16.0.0/20
+    stamps:
+      corporate-site: 10.16.0.0/27
