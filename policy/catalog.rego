@@ -2,7 +2,8 @@
 #
 #   conftest test plan.json --policy <main checkout>/policy --data <catalogs> --namespace catalog
 #
-# The rules read only data, so they give the same result for every root. The
+# The rules read only data, so they give the same result for every root,
+# except the data access group rule at the end, which reads the plan. The
 # PR's catalog/ comes as data.pr and main's as data.main (08 section 3). A file
 # that doesn't exist yet passes, and so do the rules that compare the PR with
 # main while main has no catalog/. Each stamps/<lz>/<folder>/stamp.yaml comes
@@ -842,3 +843,20 @@ hold_days(lz, y) := 1 if {
 hold_end(lz, y) := time.add_date(time.parse_ns("2006-01-02", y.decommissioned_on), 0, 0, hold_days(lz, y))
 
 date(ns) := sprintf("%d-%02d-%02d", time.date(ns))
+
+# A landing zone's data access groups grp-data-<lz>-readers and -admins
+# (ADR 0052) stay while its lz.yaml isn't cancelled: the landing-zone module
+# reads them, so deleting one fails every plan of the landing zone, and it
+# loses its members and its role assignments. A replace deletes too. The rule
+# reads the plan, so it guards platform/azure/identity.
+deny contains msg if {
+	some rc in input.resource_changes
+	rc.type == "azuread_group"
+	"delete" in rc.change.actions
+	name := rc.change.before.display_name
+	m := regex.find_all_string_submatch_n(`^grp-data-(.+)-(?:readers|admins)$`, name, 1)
+	count(m) == 1
+	y := lz_yaml[m[0][1]]
+	y.state != "cancelled"
+	msg := sprintf("%s: %s is a data access group of the landing zone %s, which is %s: it stays until the landing zone is cancelled (ADR 0052). Was a commit that removes it rebased onto main?", [rc.address, name, m[0][1], y.state])
+}

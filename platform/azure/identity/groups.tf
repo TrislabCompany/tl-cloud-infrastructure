@@ -3,6 +3,9 @@
 # them with Group.Create and owns them, which lets it manage them. It reads
 # them back, owners included, with Group.Read.All (ADR 0034).
 # grp-cust-<code>-admins come with the first customer in catalog/owners.yaml.
+# A prod landing zone's grp-data-<lz>-readers and -admins come in their own PR
+# before the landing zone's, and stay until it is cancelled: policy/catalog.rego
+# denies a plan that deletes one earlier.
 
 locals {
   groups = {

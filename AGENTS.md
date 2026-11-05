@@ -30,7 +30,7 @@ This file is the guide for every AI coding tool (Claude Code, Cursor, Codex, …
   4. `global` (`edge` → `github`)
   5. `stamps` again, to bind hostnames once `global` has written their records and certificates.
 - **One step per PR when an order is needed.** A landing zone comes in one PR and its stamps in a second, because a stamp needs the Environment `lz-<lz>` that the landing zone's apply creates. A PR that depends on another says `Depends on #<n>` in its description, and is re-planned automatically when that one is applied.
-- **Rebase before `/apply`** when `main` has changed the PR's roots since its plan.
+- **Rebase before `/apply`** when `main` has changed the PR's roots since its plan. After a rebase, `git diff --stat origin/main...HEAD` lists only the PR's own files; rebuild the branch rather than keep a commit that takes out what another PR now owns ([`_shared/pr.md`](.agents/skills/_shared/pr.md#update-a-pr)).
 - **Removing a root** (a stamp folder, a landing zone file) is planned with `-destroy` from `main`'s copy.
 
 ## Rules

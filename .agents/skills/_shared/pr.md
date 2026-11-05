@@ -52,6 +52,12 @@ tofu -chdir=<root> init -backend=false; tofu -chdir=<root> validate   # each cha
 
 - A rule that fails: fix the file, or stop and explain it. Never weaken a rule in `policy/` to pass.
 - Before the commit, `git status --porcelain` must list only the files from step 2.
+- Before every push, the first one and any after a rebase, `git diff --stat origin/main...HEAD` must list only the files from step 2. A file outside that list is a stop: find out which commit brings it.
+
+## Update a PR
+
+- To take `main`'s changes, `git fetch origin; git rebase origin/main`, then the diff check above, then `git push --force-with-lease`.
+- When part of a PR moves to another PR, rebuild the branch instead of adding a commit that takes the part out: `git switch -C <branch> origin/main; git checkout <old head> -- <this PR's files>`, then commit. Once the other PR is merged, a commit that took its files out undoes it on `main`, and the next `/apply` destroys what it created.
 
 ## 5. Commit, push, open the PR
 
@@ -81,7 +87,7 @@ The skill ends here. Print:
 - the PR's URL;
 - the next steps for the reviewers:
   1. Wait for the plan and the checks: `gh pr checks <n> -R TrislabCompany/tl-cloud-infrastructure --watch`.
-  2. Read the plan comments. A plan that creates or destroys more than expected is a stop.
+  2. Read the plan comment of every root the PR plans, not only the one it is about. A plan that creates or destroys more than expected, or plans a root the PR shouldn't touch, is a stop.
   3. A `devops` member other than the author approves the PR.
   4. A writer comments `/apply`.
   5. A `devops` member other than that commenter approves each Environment's run.
