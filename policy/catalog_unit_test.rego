@@ -565,8 +565,10 @@ group_change(name, actions) := {"resource_changes": [{
 	"change": {"actions": actions, "before": {"display_name": name}, "after": null},
 }]}
 
-group_denied(name, actions, state) := d if {
-	d := deny with input as group_change(name, actions) with data.pr as {"lz_yaml": {"products-prod-neu": lz("products-prod-neu", {"state": state})}}
+# Only this rule's messages: a bare lz.yaml trips the other landing zone rules.
+group_denied(name, actions, state) := {msg |
+	some msg in deny with input as group_change(name, actions) with data.pr as {"lz_yaml": {"products-prod-neu": lz("products-prod-neu", {"state": state})}}
+	contains(msg, "is a data access group")
 }
 
 test_data_group_of_an_active_landing_zone_is_kept if {
