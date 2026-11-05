@@ -22,7 +22,7 @@ Follow [the shared steps](../_shared/pr.md). The rules are in [AGENTS.md](../../
 | `fqdn` | yes | Lowercase. The domain root or one label below it. Never two (`www.portal.example.com`), so the free certificate covers it |
 | `stamp` | yes | `<lz>/<folder>` or its code. It has a tenant in `catalog/tenants.yaml` |
 | `app` | no | An app of the stamp with `ingress: external`. Default: the first one |
-| `access` | no | `public` (default in prod) or `protected`. Always `protected` in a sandbox landing zone. The field takes effect only once the change that adds it is merged: see [stamp-create, Access](../stamp-create/SKILL.md#access) |
+| `access` | no | `public` (default in prod) or `protected`. Always `protected` in a sandbox landing zone, where the field is left out. See [stamp-create, Access](../stamp-create/SKILL.md#access) |
 
 ## Steps
 
@@ -47,7 +47,7 @@ Follow [the shared steps](../_shared/pr.md). The rules are in [AGENTS.md](../../
    - **Check before:** the stamp serves the right version on its default hostname.
 5. **Show and ask** ([shared step 2](../_shared/pr.md#2-show-then-ask)): the hostname, the stamp and app, its access, the record that is deleted and the records that stay.
 6. **Write**, on branch `hostname-<fqdn with dots as dashes>`.
-   - **`catalog/tenants.yaml`:** append `- { fqdn: <fqdn>, app: <app> }` (with `access: protected` only once the field is supported) to the stamp's tenant's `hostnames`.
+   - **`catalog/tenants.yaml`:** append `- { fqdn: <fqdn>, app: <app> }` (with `, access: protected` for a protected prod hostname; never `access: public` in a sandbox) to the stamp's tenant's `hostnames`.
    - **`global/edge/records/<zone>/<file>.yaml`:**
      - delete the old record's line;
      - fix the comment above it so it still tells the truth, for example "The corporate site runs on the platform (stamp `shr-web-prod`); its records come from catalog/tenants.yaml."

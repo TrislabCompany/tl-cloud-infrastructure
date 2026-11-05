@@ -79,15 +79,16 @@ locals {
   stamp_hostnames = concat(
     flatten([
       for t in local.catalog.tenants : [
-        for h in try(t.hostnames, []) : { fqdn = h.fqdn, app = h.app, stamp = t.stamp }
+        for h in try(t.hostnames, []) : { fqdn = h.fqdn, app = h.app, stamp = t.stamp, access = try(h.access, "public") }
       ]
     ]),
     flatten([
       for folder, s in local.stamps : [
         for app in slice(s.external, min(1, length(s.external)), length(s.external)) : {
-          fqdn  = replace(s.default, "/^([^.]+)/", "$1-${app}")
-          app   = app
-          stamp = folder
+          fqdn   = replace(s.default, "/^([^.]+)/", "$1-${app}")
+          app    = app
+          stamp  = folder
+          access = "public"
         }
       ]
     ]),
@@ -96,13 +97,16 @@ locals {
   # By FQDN, with its zone: a hostname is a domain's root or one label below
   # it (07-catalog-and-ipam.md sections 3.1 and 3.2). A sandbox landing zone's
   # owner is trislab, or the customer code of cust-<code>-* (section 3.3).
+  # A hostname is protected by Cloudflare Access when its landing zone is a
+  # sandbox, or when its tenant entry says access: protected (zero-trust.tf).
   hostnames = {
     for h in local.stamp_hostnames : h.fqdn => merge(h, {
-      lz      = local.stamps[h.stamp].lz
-      code    = local.stamps[h.stamp].code
-      sandbox = strcontains(local.stamps[h.stamp].lz, "-sandbox-")
-      owner   = startswith(local.stamps[h.stamp].lz, "cust-") ? split("-", local.stamps[h.stamp].lz)[1] : "trislab"
-      zone    = try([for d in [h.fqdn, trimprefix(h.fqdn, "${split(".", h.fqdn)[0]}.")] : d if contains(keys(local.domains), d)][0], null)
+      lz        = local.stamps[h.stamp].lz
+      code      = local.stamps[h.stamp].code
+      sandbox   = strcontains(local.stamps[h.stamp].lz, "-sandbox-")
+      protected = strcontains(local.stamps[h.stamp].lz, "-sandbox-") || h.access == "protected"
+      owner     = startswith(local.stamps[h.stamp].lz, "cust-") ? split("-", local.stamps[h.stamp].lz)[1] : "trislab"
+      zone      = try([for d in [h.fqdn, trimprefix(h.fqdn, "${split(".", h.fqdn)[0]}.")] : d if contains(keys(local.domains), d)][0], null)
     })
   }
 }

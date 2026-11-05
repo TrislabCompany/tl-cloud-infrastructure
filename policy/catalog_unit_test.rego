@@ -29,7 +29,7 @@ good := {
 	],
 	"tenants": [
 		{"name": "corporate-site", "customer": "trislab", "stamp": "products-prod-neu/corporate-site", "hostnames": [
-			{"fqdn": "prod-corporate-site.trislab.com", "app": "web"},
+			{"fqdn": "prod-corporate-site.trislab.com", "app": "web", "access": "protected"},
 			{"fqdn": "trislab.com", "app": "web"},
 		]},
 		{"name": "construction", "customer": "trislab", "stamp": "products-prod-neu/construction-shared-01", "hostnames": [
@@ -186,6 +186,19 @@ test_tenant_in_customer_landing_zone_must_be_that_customer if {
 test_hostname_schema if {
 	denies(with_list("tenants", [object.union(good.tenants[3], {"hostnames": [{"fqdn": "Dev.trislab.com", "app": "web"}]})]), "must be { fqdn, app }")
 	denies(with_list("tenants", [object.union(good.tenants[3], {"hostnames": [{"fqdn": "dev.trislab.com"}]})]), "must be { fqdn, app }")
+	denies(with_list("tenants", [object.union(good.tenants[3], {"hostnames": [{"fqdn": "dev.trislab.com", "app": "web", "access": "private"}]})]), "must be { fqdn, app }")
+	denies(with_list("tenants", [object.union(good.tenants[3], {"hostnames": [{"fqdn": "dev.trislab.com", "app": "web", "tls": "strict"}]})]), "must be { fqdn, app }")
+}
+
+test_hostname_access if {
+	sandbox_protected := object.union(good.tenants[3], {"hostnames": [{"fqdn": "dev.trislab.com", "app": "web", "access": "protected"}]})
+	count(denied(with_list("tenants", [sandbox_protected]))) == 0
+
+	prod_public := object.union(good.tenants[0], {"hostnames": [{"fqdn": "trislab.com", "app": "web", "access": "public"}]})
+	count(denied(with_list("tenants", [prod_public]))) == 0
+
+	sandbox_public := object.union(good.tenants[3], {"hostnames": [{"fqdn": "dev.trislab.com", "app": "web", "access": "public"}]})
+	denies(with_list("tenants", [sandbox_public]), "is in a sandbox landing zone, which is always protected")
 }
 
 test_duplicate_hostname_is_denied if {

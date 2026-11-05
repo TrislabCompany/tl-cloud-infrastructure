@@ -111,15 +111,10 @@ Follow [the shared steps](../_shared/pr.md). The rules are in [AGENTS.md](../../
 
 ## Access
 
-Hostnames of stamps in a sandbox landing zone are always behind Cloudflare Access (Entra sign-in: `grp-devops`, and `grp-sandbox-trislab` or `grp-cust-<code>-admins`). Prod hostnames are public, and only the domain's real hostname should be.
+Hostnames of stamps in a sandbox landing zone are always behind Cloudflare Access (Entra sign-in: `grp-devops`, and `grp-sandbox-trislab` or `grp-cust-<code>-admins`). A prod hostname is public unless its tenant entry says `access: protected`; only the domain's real hostname should be public.
 
-A `protected` prod hostname is written as `{ fqdn: …, app: …, access: protected }`. **This field takes effect only once the change that adds it is merged**, through `policy/catalog.rego` (which today allows only `fqdn` and `app`) and through `global/edge/records.tf` and `zero-trust.tf`. Check before writing:
+- **Prod, the stamp's own `<env>-<product>` hostname:** write `{ fqdn: …, app: …, access: protected }`, so the same people who test the sandbox test prod before the public hostname goes live.
+- **Sandbox:** write no `access` field. `policy/catalog.rego` rejects `access: public` there.
+- **Derived hostnames** of further external apps (`<default>-<app>`) are not in `tenants.yaml`: in prod they are public. If one must be protected, write it in `tenants.yaml` with `access: protected` instead of relying on the derived form.
 
-```powershell
-git grep -n "access" origin/main -- policy/catalog.rego global/edge/zero-trust.tf
-```
-
-If neither knows the field:
-- **Don't write it:** the catalog rules would fail the PR.
-- **Tell the user:** the hostname will be **public** until that change is merged and the field is added.
-- **Ask** whether to go on or wait.
+`global/edge/zero-trust.tf` creates one Access application per protected hostname, in the same `global` apply that creates its records, so a protected hostname is never public.

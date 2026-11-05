@@ -288,16 +288,29 @@ hostnames contains [t.name, t.stamp, t.customer, i, h] if {
 deny contains msg if {
 	some [name, stamp, _, i, h] in hostnames
 	not valid_hostname(h)
-	msg := sprintf("catalog/tenants.yaml: hostnames[%d] of %v on %v must be { fqdn, app } with a lowercase FQDN and an app name (07 section 2.2)", [i, name, stamp])
+	msg := sprintf("catalog/tenants.yaml: hostnames[%d] of %v on %v must be { fqdn, app } with a lowercase FQDN and an app name, and an optional access: public or protected (07 section 2.2)", [i, name, stamp])
 }
 
 valid_hostname(h) if {
 	is_object(h)
-	object.keys(h) == {"fqdn", "app"}
+	object.keys(h) - {"access"} == {"fqdn", "app"}
 	is_string(h.fqdn)
 	regex.match(fqdn, h.fqdn)
 	is_string(h.app)
 	regex.match(slug, h.app)
+	valid_access(h)
+}
+
+valid_access(h) if not "access" in object.keys(h)
+
+valid_access(h) if h.access in {"public", "protected"}
+
+# A sandbox hostname is always behind Cloudflare Access, so it can't be public.
+deny contains msg if {
+	some [name, stamp, _, i, h] in hostnames
+	contains(split(stamp, "/")[0], "-sandbox-")
+	h.access == "public"
+	msg := sprintf("catalog/tenants.yaml: hostnames[%d] of %v on %v is in a sandbox landing zone, which is always protected: remove access: public (07 section 3.3)", [i, name, stamp])
 }
 
 all_fqdns := [h.fqdn | some [_, _, _, _, h] in hostnames]
