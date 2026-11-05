@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds one stamp value of 08 section 2 from the Environment lz-<lz>.
 #
-#   stamp-values.sh data_access | app_repo_ids | origin_cert_versions | edge_hostnames < variables.json
+#   stamp-values.sh data_access | app_repo_ids | origin_cert_versions | edge_hostnames | alert_action_group_ids < variables.json
 #   stamp-values.sh origin_certs < secrets.json
 #
 # Reads a JSON object of names to values on stdin: the Environment's variables
@@ -24,11 +24,15 @@ case "${1:-}" in
     # [] while global/edge hasn't written the variable yet (ADR 0027).
     jq -c '(.EDGE_HOSTNAMES // "[]") | fromjson
       | if type == "array" and all(.[]; type == "string") then . else error("EDGE_HOSTNAMES is not a list of hostnames") end' ;;
+  alert_action_group_ids)
+    # [] in a sandbox landing zone, and while landing-zones/_root hasn't written the variable yet (06 section 6.8).
+    jq -c '(.ALERT_ACTION_GROUP_IDS // "[]") | fromjson
+      | if type == "array" and all(.[]; type == "string") then . else error("ALERT_ACTION_GROUP_IDS is not a list of action group IDs") end' ;;
   origin_certs)
     # ORIGIN_CERT_<ZONE> -> {"<ZONE>": "<certificate and key PEM>"}. A credential: never printed by the caller.
     jq -c 'to_entries | map(select((.key | test("^ORIGIN_CERT_[A-Z0-9_]+$")) and (.key | test("_VERSION$") | not))
       | {key: (.key | sub("^ORIGIN_CERT_"; "")), value: .value}) | from_entries' ;;
   *)
-    echo "usage: stamp-values.sh data_access|app_repo_ids|origin_cert_versions|edge_hostnames|origin_certs < values.json" >&2
+    echo "usage: stamp-values.sh data_access|app_repo_ids|origin_cert_versions|edge_hostnames|alert_action_group_ids|origin_certs < values.json" >&2
     exit 2 ;;
 esac

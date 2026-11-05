@@ -156,12 +156,13 @@ jobs:
           app_repo_ids=$(bash main/.github/scripts/stamp-values.sh app_repo_ids < "$values")
           origin_cert_versions=$(bash main/.github/scripts/stamp-values.sh origin_cert_versions < "$values")
           edge_hostnames=$(bash main/.github/scripts/stamp-values.sh edge_hostnames < "$values")
+          alert_action_group_ids=$(bash main/.github/scripts/stamp-values.sh alert_action_group_ids < "$values")
           ghcr_pull_token_version=$(jq -r '.GHCR_PULL_TOKEN_VERSION // ""' "$values")
           {
             echo "client_id=$client_id"; echo "subscription_id=$subscription_id"
             echo "data_access=$data_access"; echo "app_repo_ids=$app_repo_ids"
             echo "origin_cert_versions=$origin_cert_versions"; echo "ghcr_pull_token_version=$ghcr_pull_token_version"
-            echo "edge_hostnames=$edge_hostnames"
+            echo "edge_hostnames=$edge_hostnames"; echo "alert_action_group_ids=$alert_action_group_ids"
           } >> "$GITHUB_OUTPUT"
 
       - name: Find the plan identity
@@ -347,6 +348,7 @@ jobs:
           TF_VAR_origin_cert_versions: ${{ steps.lz.outputs.origin_cert_versions }}
           TF_VAR_ghcr_pull_token_version: ${{ steps.lz.outputs.ghcr_pull_token_version }}
           TF_VAR_edge_hostnames: ${{ steps.lz.outputs.edge_hostnames }}
+          TF_VAR_alert_action_group_ids: ${{ steps.lz.outputs.alert_action_group_ids }}
           # global/edge only: the cloudflare provider's read-only token (16 section 7).
           CLOUDFLARE_API_TOKEN: ${{ inputs.root == 'global/edge' && secrets.CLOUDFLARE_API_TOKEN_PLAN || '' }}
           # The github provider of landing-zones/_root, global/edge and global/github, read-only
