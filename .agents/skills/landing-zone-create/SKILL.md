@@ -92,10 +92,12 @@ Follow [the shared steps](../_shared/pr.md). The rules are in [AGENTS.md](../../
      ```
 
      Skip this when the entries already exist. A sandbox landing zone uses the shared `grp-data-sandbox-*`, and a regulated one uses `grp-regulated-admins`.
+
+     **The groups go in a PR of their own, opened first,** on branch `identity-data-groups-<name>`, titled "Add the data access groups of <name>", root `platform/azure/identity`. The landing zone's plan reads the groups from Entra, so in a single PR it fails until the groups are applied, and a failed plan leaves no saved plan to apply. The landing zone PR then ends its body with `Depends on #<groups PR>` and is re-planned when that one is applied.
 8. **Check** ([shared step 4](../_shared/pr.md#4-check)): `tofu fmt -check -recursive`, `check-catalog.py`, and for prod `tofu -chdir=platform/azure/identity init -backend=false` then `validate`.
 9. **Open the PR** ([shared step 5](../_shared/pr.md#5-commit-push-open-the-pr)).
    - **Title:** "Create the landing zone <name>".
-   - **Roots in order:** `platform/azure/identity` (prod only) → `landing-zones/_root` key `<name>`.
+   - **Roots:** `landing-zones/_root` key `<name>`; for prod, the groups PR's root `platform/azure/identity` is applied before it.
    - **Expected re-runs in the body:**
      - `MissingSubscriptionRegistration` on the first apply: run `/apply` again.
      - The budget fails with `401 Unauthorized` for up to 48 hours on a new subscription: every other step is applied and the PR stays open. Wait, then run `/apply` again.
