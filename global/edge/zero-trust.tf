@@ -1,5 +1,6 @@
 # Cloudflare Zero Trust in the team trislab, with Entra ID sign-in through
-# app-cloudflare-access, and one Access application per sandbox hostname
+# app-cloudflare-access, and one Access application per protected hostname:
+# every sandbox hostname, and a production one marked access: protected
 # (07-catalog-and-ipam.md section 3.3, ADR 0027, Technical details).
 
 # Started by hand on the Free plan, because Cloudflare starts Zero Trust on an
@@ -97,16 +98,19 @@ resource "cloudflare_zero_trust_access_identity_provider" "entra" {
   }
 }
 
-# ---- Access to sandbox hostnames ---------------------------------------------
-# One reusable policy per owner with sandbox hostnames, admitting its Entra
-# groups by object ID, and one self-hosted application per sandbox hostname,
-# derived ones included. Production hostnames are public.
+# ---- Access to protected hostnames -------------------------------------------
+# One reusable policy per owner with protected hostnames, admitting its Entra
+# groups by object ID, and one self-hosted application per protected hostname,
+# derived ones included. Every sandbox hostname is protected. A production
+# hostname is public unless its tenant entry says access: protected, as for
+# the internal test hostname prod-<product>.trislab.com: the same people who
+# test the sandbox test production before its public hostname goes live.
 
 locals {
-  sandbox_hostnames = { for fqdn, h in local.hostnames : fqdn => h if h.sandbox }
+  protected_hostnames = { for fqdn, h in local.hostnames : fqdn => h if h.protected }
 
   access_groups = {
-    for owner in distinct([for h in local.sandbox_hostnames : h.owner]) :
+    for owner in distinct([for h in local.protected_hostnames : h.owner]) :
     owner => ["grp-devops", owner == "trislab" ? "grp-sandbox-trislab" : "grp-cust-${owner}-admins"]
   }
 }
@@ -117,11 +121,25 @@ data "azuread_group" "access" {
   security_enabled = true
 }
 
-resource "cloudflare_zero_trust_access_policy" "sandbox" {
+# Renamed from sandbox: moved keeps the existing policies and applications, so
+# no sandbox hostname is ever without its Access application during the apply.
+moved {
+  from = cloudflare_zero_trust_access_policy.sandbox
+  to   = cloudflare_zero_trust_access_policy.protected
+}
+
+moved {
+  from = cloudflare_zero_trust_access_application.sandbox
+  to   = cloudflare_zero_trust_access_application.protected
+}
+
+resource "cloudflare_zero_trust_access_policy" "protected" {
   for_each   = local.access_groups
   account_id = var.cloudflare_account_id
-  name       = "sandbox-${each.key}"
-  decision   = "allow"
+  # The name stays sandbox-<owner>: changing it is cosmetic and would update
+  # every policy in the first apply.
+  name     = "sandbox-${each.key}"
+  decision = "allow"
 
   include = [
     for g in each.value : {
@@ -133,8 +151,8 @@ resource "cloudflare_zero_trust_access_policy" "sandbox" {
   ]
 }
 
-resource "cloudflare_zero_trust_access_application" "sandbox" {
-  for_each                  = local.sandbox_hostnames
+resource "cloudflare_zero_trust_access_application" "protected" {
+  for_each                  = local.protected_hostnames
   account_id                = var.cloudflare_account_id
   name                      = each.key
   domain                    = each.key
@@ -143,7 +161,7 @@ resource "cloudflare_zero_trust_access_application" "sandbox" {
   auto_redirect_to_identity = true
 
   policies = [{
-    id         = cloudflare_zero_trust_access_policy.sandbox[each.value.owner].id
+    id         = cloudflare_zero_trust_access_policy.protected[each.value.owner].id
     precedence = 1
   }]
 }
