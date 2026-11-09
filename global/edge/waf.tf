@@ -1,8 +1,11 @@
 # The WAF rules of the zones that serve stamps, on the Cloudflare Free plan
 # (10-roadmap.md section 13, phase 10 edge rules; ADR 0027). Cloudflare's free
 # managed ruleset runs on every proxied name of every zone by default and isn't
-# managed here. A zone that serves no stamp hostname gets none of these rules:
-# its proxied names are sites on outside hosting, which may serve PHP.
+# managed here. A zone that serves no stamp hostname gets no custom rule: its
+# proxied names are sites on outside hosting, which may serve PHP. It gets the
+# rate limit only when its domain sets waf_rate_limit: true in
+# catalog/tenants.yaml, so the outside sites of a zone such as trislab.com keep
+# it while the zone has no stamp (07 section 2.1).
 #
 # The Free plan allows 5 custom rules and 1 rate limiting rule per zone. Each
 # phase has one entry-point ruleset per zone, so a rule added by hand in the
@@ -14,6 +17,12 @@ locals {
     for z in distinct(compact([for h in values(local.hostnames) : h.zone])) :
     z => sort([for fqdn, h in local.hostnames : fqdn if h.zone == z])
   }
+
+  # The zones that serve stamps, and those whose domain opts in.
+  rate_limit_zones = toset(concat(
+    keys(local.waf_zones),
+    [for d in local.catalog.domains : d.name if try(d.waf_rate_limit, false)],
+  ))
 }
 
 # Requests for paths no platform app serves: PHP, WordPress and leaked
@@ -50,10 +59,11 @@ resource "cloudflare_ruleset" "waf_custom" {
 # stamps out. A page of the corporate site loads fewer than 10 files. The Free plan
 # fixes the period and the timeout at 10 seconds and allows only the path and
 # verified bot fields, so the rule covers every proxied name of the zone, not
-# only the stamp hostnames. Verified bots, search engines among them, are left
-# out.
+# only the stamp hostnames. That is why a zone can keep it without stamps
+# (waf_rate_limit in catalog/tenants.yaml). Verified bots, search engines among
+# them, are left out.
 resource "cloudflare_ruleset" "waf_rate_limit" {
-  for_each = local.waf_zones
+  for_each = local.rate_limit_zones
   zone_id  = cloudflare_zone.this[each.key].id
   name     = "waf-rate-limit"
   kind     = "zone"

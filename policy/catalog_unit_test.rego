@@ -170,6 +170,12 @@ test_domain_owner_must_be_customer_or_trislab if {
 	denies(with_list("domains", array.concat(good.domains, [{"name": "x.example", "owner": "construction"}])), "the domain x.example has the owner construction")
 }
 
+test_domain_waf_rate_limit_is_a_boolean if {
+	on := [object.union(good.domains[0], {"waf_rate_limit": true})]
+	count(denied(with_list("domains", array.concat(on, array.slice(good.domains, 1, count(good.domains)))))) == 0
+	denies(with_list("domains", array.concat([object.union(good.domains[0], {"waf_rate_limit": "yes"})], array.slice(good.domains, 1, count(good.domains)))), "waf_rate_limit is yes, which is not allowed")
+}
+
 test_tenant_customer_must_be_customer_or_trislab if {
 	denies(with_list("tenants", [object.union(good.tenants[1], {"customer": "vbs-lawyers"})]), "has the customer vbs-lawyers")
 }
