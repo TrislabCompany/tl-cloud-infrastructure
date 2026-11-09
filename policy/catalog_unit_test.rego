@@ -296,6 +296,14 @@ test_overlapping_ranges_are_denied if {
 	denies(with_list("hubs", [object.union(good.hubs[0], {"subnets": {"GatewaySubnet": "10.0.0.0/27", "x": "10.0.0.16/28"}})]), "overlaps")
 }
 
+test_managed_stamp_takes_no_range if {
+	managed := object.union(stamp("corporate-site", "trislab-website-corporate-site"), {"network": {"mode": "managed"}})
+	denies(with_stamp("products-sandbox-neu/corporate-site-staging", managed), "the stamp products-sandbox-neu/corporate-site-staging has network.mode managed, so it takes no range")
+	count([msg | some msg in denied(with_stamp("products-sandbox-neu/corporate-site-dev", managed)); contains(msg, "network.mode managed")]) == 0
+	vnet := object.union(stamp("corporate-site", "trislab-website-corporate-site"), {"network": {"subnet_cidr": "10.32.0.0/27"}})
+	count([msg | some msg in denied(with_stamp("products-sandbox-neu/corporate-site-staging", vnet)); contains(msg, "network.mode managed")]) == 0
+}
+
 test_stamp_in_its_landing_zone_is_no_overlap if {
 	count([msg | some msg in denied(good); contains(msg, "overlaps")]) == 0
 }

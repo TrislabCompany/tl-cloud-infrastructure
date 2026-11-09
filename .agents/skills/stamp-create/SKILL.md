@@ -1,6 +1,6 @@
 ---
 name: stamp-create
-description: Create a stamp (one Environment of an app, e.g. dev, staging or prod) in an existing landing zone of tl-cloud-infrastructure — write stamps/<lz>/<folder>/stamp.yaml, generate main.tf with the pinned tl-platform generator, lock the providers, reserve its /27 in catalog/ipam.yaml and add its tenant with the default hostname <env>-<product>.trislab.com (public or protected) to catalog/tenants.yaml — as one PR opened with the user's own gh credentials. Use when the user asks to create, add, provision, deploy infrastructure for or set up a stamp, an environment such as dev, test, staging, demo or prod for an app, or a production stamp.
+description: Create a stamp (one Environment of an app, e.g. dev, staging or prod) in an existing landing zone of tl-cloud-infrastructure — write stamps/<lz>/<folder>/stamp.yaml, generate main.tf with the pinned tl-platform generator, lock the providers, choose its network mode (managed by default; a /27 in catalog/ipam.yaml only for vnet) and add its tenant with the default hostname <env>-<product>.trislab.com (public or protected) to catalog/tenants.yaml — as one PR opened with the user's own gh credentials. Use when the user asks to create, add, provision, deploy infrastructure for or set up a stamp, an environment such as dev, test, staging, demo or prod for an app, or a production stamp.
 metadata:
   owner: infrastructure
 ---
@@ -27,6 +27,7 @@ Follow [the shared steps](../_shared/pr.md). The rules are in [AGENTS.md](../../
 | `environment` | yes | In a prod landing zone, only `prod`. In a sandbox one: `dev`, `test`, `uat`, `perf`, `demo`, `staging`, or `pr<n>` (which needs `ttl`) |
 | `apps` | yes | Each with `name` (2–10 characters), `repo` (an `active` entry in `catalog/repos.yaml`), `ingress` (`external`, `internal` or `none`), `port`, and `caps` (`cpu`, `memory`, `max_replicas`). Default: copy the apps of the product's existing stamp, for example `stamps/products-sandbox-neu/corporate-site-dev/stamp.yaml` |
 | `tenancy` | yes | `dedicated` (default, and the only choice in a customer landing zone) or `shared` |
+| `network` | no | `managed` (default) or `vnet`. `vnet` is required in a `regulated` landing zone, with `zone_redundant: true`, and when an app reaches a private endpoint or a private database through the spoke. `managed` has no subnet, load balancer or public IP of the stamp's, which saves about EUR 20 a month (ADR 0058). Needs `aca-app` v1.2.0 or later; an older version is always `vnet` |
 | `version` | no | The `aca-app` release. Default: the newest tag `aca-app/v*` in `tl-platform`. Show it next to the version the product's other stamps pin |
 | `access` | no | `public` or `protected`, for the default hostname. In a sandbox landing zone it is always `protected` (Cloudflare Access). In prod, default `protected` for the stamp's own `<env>-<product>` hostname: only the product's real domain is public. See [Access](#access) |
 
@@ -39,10 +40,11 @@ Follow [the shared steps](../_shared/pr.md). The rules are in [AGENTS.md](../../
    - The product and each app's repository are active in the catalog.
    - In a prod landing zone the environment is `prod`, and in a sandbox one it isn't.
    - The folder doesn't exist and isn't in `catalog/ipam.yaml`.
+   - With `network: managed`, the landing zone isn't `archetype: regulated`. Otherwise ask whether to use `vnet`.
 3. **Compute:**
    - **Folder:** `<product>-<environment>`, or `<product>` alone in a prod landing zone, for example `stamps/products-prod-neu/corporate-site`.
    - **Stamp code:** `<owner code>-<product code>-<environment>`. `<owner code>` is `shr` in `products-*` and the customer's code in `cust-*`, and `<product code>` is the product's `code` in `owners.yaml`. Example: `shr-web-prod`.
-   - **Range:** `python .agents/skills/_shared/ipam.py stamp <lz>` gives the lowest free aligned /27. A Dedicated workload profile needs a /26 or larger (`--prefix 26`). This template allows only `Consumption`.
+   - **Range,** only with `network: vnet`: `python .agents/skills/_shared/ipam.py stamp <lz>` gives the lowest free aligned /27. A Dedicated workload profile needs a /26 or larger (`--prefix 26`). This template allows only `Consumption`.
    - **Default hostname** (first app with `ingress: external`):
      - in `products-*` and `prdt-*`: `<environment>-<product>.trislab.com`;
      - in `cust-<code>-*`: `<environment>-<product>-<customer slug>.trislab.com`;
@@ -52,7 +54,8 @@ Follow [the shared steps](../_shared/pr.md). The rules are in [AGENTS.md](../../
 4. **Show and ask** ([shared step 2](../_shared/pr.md#2-show-then-ask)):
    - lz, folder, stamp code, environment;
    - apps and caps, template version;
-   - range, hostname and its access;
+   - network mode, and the range with `vnet`;
+   - hostname and its access;
    - the GitHub Environment it will create in the app repository.
 5. **Write**, on branch `stamp-<lz>-<folder>`.
    - **`stamps/<lz>/<folder>/stamp.yaml`**, in the style of the existing stamps:
@@ -66,7 +69,7 @@ Follow [the shared steps](../_shared/pr.md). The rules are in [AGENTS.md](../../
      environment: <environment>
      tenancy: dedicated
      network:
-       subnet_cidr: <the /27>
+       mode: managed                 # with vnet: mode: vnet and subnet_cidr: <the /27>
      apps:
        - name: web
          repo: <repo>
@@ -87,7 +90,7 @@ Follow [the shared steps](../_shared/pr.md). The rules are in [AGENTS.md](../../
      - Copy it from another stamp that pins the same `aca-app` version.
      - If there is none: `tofu -chdir=stamps/<lz>/<folder> init -backend=false`, then `tofu -chdir=stamps/<lz>/<folder> providers lock -platform=linux_amd64`, then delete `stamps/<lz>/<folder>/.terraform`.
      - The folder may hold only `stamp.yaml`, `main.tf` and `.terraform.lock.hcl`: `stamp-check` fails on anything else.
-   - **`catalog/ipam.yaml`:** under the landing zone's entry, add `stamps:` if it is missing, then `<folder>: <the /27>`.
+   - **`catalog/ipam.yaml`,** only with `network: vnet`: under the landing zone's entry, add `stamps:` if it is missing, then `<folder>: <the /27>`. A `managed` stamp has no entry: `policy/catalog.rego` denies one.
    - **`catalog/tenants.yaml`:** append under `tenants` (one tenant on a dedicated stamp):
 
      ```yaml

@@ -603,6 +603,18 @@ deny contains msg if {
 	msg := sprintf("catalog/ipam.yaml: the stamp %v of %v has the range %v, which is not an IPv4 CIDR (07 section 5)", [stamp, lz.name, c])
 }
 
+# A managed stamp runs on Azure's network and takes no range (ADR 0058).
+deny contains msg if {
+	some key, s in stamp_yaml
+	s.network.mode == "managed"
+	parts := split(key, "/")
+	some lz in landing_zones
+	lz.name == parts[0]
+	is_object(lz.stamps)
+	lz.stamps[parts[1]]
+	msg := sprintf("catalog/ipam.yaml: the stamp %v has network.mode managed, so it takes no range: remove %v under %v (07 section 6.3, ADR 0058)", [key, parts[1], parts[0]])
+}
+
 # No two ranges overlap, except a stamp inside its landing zone and a subnet inside its hub.
 deny contains msg if {
 	some groups in range_groups
