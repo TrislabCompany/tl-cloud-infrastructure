@@ -354,9 +354,10 @@ jobs:
           # (08 section 2, Provider credentials).
           GITHUB_TOKEN: ${{ steps.app.outputs.token }}
           GITHUB_OWNER: ${{ steps.app.outputs.token && github.repository_owner || '' }}
-          # global/edge only: the cloudflare provider's edit token of the Environment global,
-          # never in $GITHUB_ENV (16 section 7).
-          CLOUDFLARE_API_TOKEN: ${{ inputs.root == 'global/edge' && secrets.CLOUDFLARE_API_TOKEN || '' }}
+          # global/edge and global/github only: the cloudflare provider's edit token of the
+          # Environment global, never in $GITHUB_ENV (16 section 7). global/github creates the
+          # deploy tokens of the Pages sites.
+          CLOUDFLARE_API_TOKEN: ${{ (inputs.root == 'global/edge' || inputs.root == 'global/github') && secrets.CLOUDFLARE_API_TOKEN || '' }}
           # Stamps only, both ephemeral inputs: the GHCR pull token of lz-<lz>, and its secrets,
           # from which the origin certificates are taken (06 section 2, ADR 0026).
           TF_VAR_ghcr_pull_token: ${{ startsWith(inputs.root, 'stamps/') && secrets.GHCR_PULL_TOKEN || '' }}
@@ -417,7 +418,7 @@ jobs:
           # As in tofu apply.
           GITHUB_TOKEN: ${{ steps.app.outputs.token }}
           GITHUB_OWNER: ${{ steps.app.outputs.token && github.repository_owner || '' }}
-          CLOUDFLARE_API_TOKEN: ${{ inputs.root == 'global/edge' && secrets.CLOUDFLARE_API_TOKEN || '' }}
+          CLOUDFLARE_API_TOKEN: ${{ (inputs.root == 'global/edge' || inputs.root == 'global/github') && secrets.CLOUDFLARE_API_TOKEN || '' }}
           TF_VAR_ghcr_pull_token: ${{ startsWith(inputs.root, 'stamps/') && secrets.GHCR_PULL_TOKEN || '' }}
           LZ_SECRETS: ${{ startsWith(inputs.root, 'stamps/') && toJSON(secrets) || '' }}
           DESTROY: ${{ steps.dir.outputs.destroy }}
