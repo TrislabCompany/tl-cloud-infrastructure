@@ -4,6 +4,7 @@
 domains:
   - name: trislab.com
     owner: trislab
+    waf_rate_limit: true             # the rate limit stays without stamps (07 section 2.1)
     redirects:
       - { from: www.trislab.com, to: trislab.com }
   - name: dragonja.si
