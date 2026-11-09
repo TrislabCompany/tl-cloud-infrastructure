@@ -18,11 +18,6 @@ domains:
 tenants:
   - name: corporate-site
     customer: trislab
-    stamp: products-sandbox-neu/corporate-site-staging
-    hostnames:
-      - { fqdn: staging-corporate-site.trislab.com, app: web }
-  - name: corporate-site
-    customer: trislab
     stamp: products-prod-neu/corporate-site
     hostnames:
       - { fqdn: prod-corporate-site.trislab.com, app: web, access: protected }
