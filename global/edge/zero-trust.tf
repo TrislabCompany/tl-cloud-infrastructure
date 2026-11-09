@@ -1,6 +1,7 @@
 # Cloudflare Zero Trust in the team trislab, with Entra ID sign-in through
 # app-cloudflare-access, and one Access application per protected hostname:
-# every sandbox hostname, and a production one marked access: protected
+# every sandbox hostname, a production one marked access: protected, the
+# protected hostnames of Pages sites and their pages.dev names
 # (07-catalog-and-ipam.md section 3.3, ADR 0027, Technical details).
 
 # Started by hand on the Free plan, because Cloudflare starts Zero Trust on an
@@ -107,10 +108,25 @@ resource "cloudflare_zero_trust_access_identity_provider" "entra" {
 # test the sandbox test production before its public hostname goes live.
 
 locals {
-  protected_hostnames = { for fqdn, h in local.hostnames : fqdn => h if h.protected }
+  # The protected hostnames of stamps and of sites on Cloudflare Pages
+  # (pages.tf), with the owner whose policy admits them.
+  protected_hostnames = merge(
+    { for fqdn, h in local.hostnames : fqdn => { owner = h.owner } if h.protected },
+    { for fqdn, h in local.pages_hostnames : fqdn => { owner = h.owner } if h.protected },
+  )
+
+  # A Pages project's own names, <project>.pages.dev for production and
+  # *.<project>.pages.dev for its branches, serve the same files as its
+  # hostnames, so they are always protected.
+  pages_dev_names = merge([
+    for repo, p in local.pages : {
+      "${repo}.pages.dev"   = { repo = repo, prefix = "", owner = p.owner }
+      "*.${repo}.pages.dev" = { repo = repo, prefix = "*.", owner = p.owner }
+    }
+  ]...)
 
   access_groups = {
-    for owner in distinct([for h in local.protected_hostnames : h.owner]) :
+    for owner in distinct(concat([for h in local.protected_hostnames : h.owner], [for n in local.pages_dev_names : n.owner])) :
     owner => ["grp-devops", owner == "trislab" ? "grp-sandbox-trislab" : "grp-cust-${owner}-admins"]
   }
 }
@@ -156,6 +172,21 @@ resource "cloudflare_zero_trust_access_application" "protected" {
   account_id                = var.cloudflare_account_id
   name                      = each.key
   domain                    = each.key
+  type                      = "self_hosted"
+  allowed_idps              = [cloudflare_zero_trust_access_identity_provider.entra.id]
+  auto_redirect_to_identity = true
+
+  policies = [{
+    id         = cloudflare_zero_trust_access_policy.protected[each.value.owner].id
+    precedence = 1
+  }]
+}
+
+resource "cloudflare_zero_trust_access_application" "pages_dev" {
+  for_each                  = local.pages_dev_names
+  account_id                = var.cloudflare_account_id
+  name                      = each.key
+  domain                    = "${each.value.prefix}${cloudflare_pages_project.this[each.value.repo].subdomain}"
   type                      = "self_hosted"
   allowed_idps              = [cloudflare_zero_trust_access_identity_provider.entra.id]
   auto_redirect_to_identity = true

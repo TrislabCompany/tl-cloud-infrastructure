@@ -7,3 +7,19 @@ repos:
     template: tl-template-website
     maintainers: [tl-janskof]
     state: active
+
+# Sites on Cloudflare Pages, one entry per repository (a tl-template-website
+# repository that no stamp deploys from). global/edge creates the Pages project,
+# named after the repository, and for each environment its custom hostname, a
+# proxied CNAME to the Pages branch of the same name (production is the
+# project's production branch) and an Access application unless access: public.
+# global/github creates the repository's GitHub Environment of the same name,
+# with the deploy variables and the secret CLOUDFLARE_API_TOKEN. Deleting an
+# environment deletes its hostname, record, Access application and GitHub
+# Environment; deleting the entry also deletes the project and its token.
+pages:
+  - repo: trislab-website-corporate-site
+    environments:
+      - { name: dev, hostname: dev-corporate-site.trislab.com }
+      - { name: staging, hostname: staging-corporate-site.trislab.com }
+      - { name: production, hostname: prod-corporate-site.trislab.com }

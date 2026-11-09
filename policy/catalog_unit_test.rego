@@ -601,3 +601,54 @@ test_data_group_create_and_other_groups_pass if {
 	count(group_denied("grp-data-cust-oc-prod-neu-admins", ["delete"], "active")) == 0
 	count(group_denied("grp-devops", ["delete"], "active")) == 0
 }
+
+# ---- repos.yaml, pages ----
+
+website_repo := {"name": "trislab-website-construction", "product": "construction", "template": "tl-template-website", "maintainers": ["octo-anna"], "state": "active"}
+
+site := {"repo": "trislab-website-construction", "environments": [
+	{"name": "dev", "hostname": "dev-construction.trislab.com"},
+	{"name": "staging", "hostname": "staging-construction.trislab.com"},
+	{"name": "production", "hostname": "prod-construction.trislab.com", "access": "public"},
+]}
+
+with_pages(entries) := object.union(good, {"repos": array.concat(good.repos, [website_repo]), "pages": entries})
+
+with_site_hostname(h) := with_pages([object.union(site, {"environments": [{"name": "dev", "hostname": h}]})])
+
+test_good_site_passes if {
+	count(denied(with_pages([site]))) == 0
+}
+
+test_site_schema if {
+	denies(with_pages([object.union(site, {"branch": "main"})]), "pages[0] has the unknown field branch")
+	denies(with_pages([{"repo": "trislab-website-construction"}]), "pages[0] has no environments")
+	denies(with_pages([site, site]), "the repo trislab-website-construction is used more than once")
+}
+
+test_site_environments if {
+	bad := [
+		{"name": "prod", "hostname": "prod-construction.trislab.com"},
+		{"name": "dev", "hostname": "Dev-construction.trislab.com"},
+		{"name": "dev", "hostname": "dev-construction.trislab.com", "access": "open"},
+		{"name": "dev", "hostname": "dev-construction.trislab.com", "app": "web"},
+	]
+	every e in bad {
+		denies(with_pages([object.union(site, {"environments": [e]})]), "environments[0] of the site trislab-website-construction must be")
+	}
+	twice := [{"name": "dev", "hostname": "dev-construction.trislab.com"}, {"name": "dev", "hostname": "dev2-construction.trislab.com"}]
+	denies(with_pages([object.union(site, {"environments": twice})]), "has the environment dev more than once")
+}
+
+test_site_repository if {
+	denies(object.union(good, {"pages": [site]}), "the site trislab-website-construction is not an active tl-template-website repository")
+	denies(with_pages([object.union(site, {"repo": "trislab-saas-construction"})]), "is not an active tl-template-website repository")
+	denies(with_pages([object.union(site, {"repo": "trislab-website-corporate-site"})]), "so no stamp may deploy from it, but stamps/products-prod-neu/corporate-site/stamp.yaml does")
+}
+
+test_site_hostnames if {
+	denies(with_site_hostname("prod-corporate-site.trislab.com"), "the hostname prod-corporate-site.trislab.com is used more than once")
+	denies(with_site_hostname("dev-construction.example.org"), "the hostname dev-construction.example.org of the site trislab-website-construction is in no domain")
+	denies(with_site_hostname("dev.construction.trislab.com"), "is more than one label below trislab.com")
+	denies(with_site_hostname("dev-construction.astra-group.example"), "is in astra-group.example, which belongs to another customer")
+}
