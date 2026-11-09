@@ -23,6 +23,10 @@ default repos := []
 
 repos := data.pr.repos
 
+default pages := []
+
+pages := data.pr.pages
+
 default domains := []
 
 domains := data.pr.domains
@@ -59,6 +63,9 @@ schemas := {
 		"name": slug, "product": slug, "customer": slug, "template": `^tl-template-(website|webapp|saas)$`,
 		"maintainers": "array", "state": `^(active|archived)$`, "archived_on": `^[0-9]{4}-[0-9]{2}-[0-9]{2}$`,
 	}},
+	"pages": {"file": "repos.yaml", "section": 11, "required": {"repo", "environments"}, "fields": {
+		"repo": slug, "environments": "array",
+	}},
 	"domains": {"file": "tenants.yaml", "section": 2, "required": {"name", "owner"}, "fields": {
 		"name": fqdn, "owner": slug, "redirects": "array", "waf_rate_limit": "boolean",
 	}},
@@ -74,7 +81,7 @@ schemas := {
 }
 
 lists := {
-	"owners": owners, "regions": regions, "repos": repos, "domains": domains,
+	"owners": owners, "regions": regions, "repos": repos, "pages": pages, "domains": domains,
 	"tenants": tenants, "hubs": hubs, "landing_zones": landing_zones,
 }
 
@@ -165,7 +172,7 @@ duplicates(list, key) := {v |
 }
 
 deny contains msg if {
-	some [list, key] in [["owners", "slug"], ["owners", "code"], ["regions", "code"], ["repos", "name"], ["domains", "name"], ["hubs", "name"], ["landing_zones", "name"]]
+	some [list, key] in [["owners", "slug"], ["owners", "code"], ["regions", "code"], ["repos", "name"], ["pages", "repo"], ["domains", "name"], ["hubs", "name"], ["landing_zones", "name"]]
 	some v in duplicates(list, key)
 	msg := sprintf("%s: the %s %v is used more than once (07 section %d)", [where(list), key, v, schemas[list].section])
 }
@@ -243,6 +250,82 @@ deny contains msg if {
 	msg := sprintf("catalog/repos.yaml: %v is archived and has no archived_on (07 section 11)", [r.name])
 }
 
+# ---- repos.yaml, pages: sites on Cloudflare Pages (07 section 11) ----
+
+# [repo, i, environment] for every environment of a site.
+pages_environments contains [p.repo, i, e] if {
+	some p in pages
+	is_array(p.environments)
+	some i, e in p.environments
+}
+
+valid_pages_environment(e) if {
+	is_object(e)
+	object.keys(e) - {"access"} == {"name", "hostname"}
+	e.name in {"dev", "staging", "production"}
+	is_string(e.hostname)
+	regex.match(fqdn, e.hostname)
+	valid_access(e)
+}
+
+pages_fqdns := [e.hostname | some [_, _, e] in pages_environments; valid_pages_environment(e)]
+
+deny contains msg if {
+	some [repo, i, e] in pages_environments
+	not valid_pages_environment(e)
+	msg := sprintf("catalog/repos.yaml: environments[%d] of the site %v must be { name, hostname } with the name dev, staging or production and a lowercase FQDN, and an optional access: public or protected (07 section 11)", [i, repo])
+}
+
+deny contains msg if {
+	some p in pages
+	is_array(p.environments)
+	some n in {e.name | some e in p.environments; is_object(e)}
+	count([e | some e in p.environments; is_object(e); e.name == n]) > 1
+	msg := sprintf("catalog/repos.yaml: the site %v has the environment %v more than once (07 section 11)", [p.repo, n])
+}
+
+deny contains msg if {
+	some p in pages
+	not p.repo in {r.name | some r in repos; r.state == "active"; r.template == "tl-template-website"}
+	msg := sprintf("catalog/repos.yaml: the site %v is not an active tl-template-website repository in repos (07 section 11)", [p.repo])
+}
+
+# A repository deploys either to Cloudflare Pages or to stamps.
+deny contains msg if {
+	some p in pages
+	some stamp, s in stamp_yaml
+	some a in s.apps
+	a.repo == p.repo
+	msg := sprintf("catalog/repos.yaml: the site %v is on Cloudflare Pages, so no stamp may deploy from it, but stamps/%s/stamp.yaml does (07 section 11)", [p.repo, stamp])
+}
+
+deny contains msg if {
+	some [repo, _, e] in pages_environments
+	valid_pages_environment(e)
+	not domain_of(e.hostname)
+	msg := sprintf("catalog/repos.yaml: the hostname %v of the site %v is in no domain of domains in catalog/tenants.yaml (07 section 3.2)", [e.hostname, repo])
+}
+
+deny contains msg if {
+	some [repo, _, e] in pages_environments
+	valid_pages_environment(e)
+	d := domain_of(e.hostname)
+	e.hostname != d
+	contains(trim_suffix(e.hostname, concat("", [".", d])), ".")
+	msg := sprintf("catalog/repos.yaml: the hostname %v of the site %v is more than one label below %v (07 section 3)", [e.hostname, repo, d])
+}
+
+deny contains msg if {
+	some [repo, _, e] in pages_environments
+	valid_pages_environment(e)
+	d := domain_of(e.hostname)
+	some r in repos
+	r.name == repo
+	owner := {x.owner | some x in domains; x.name == d}
+	count(owner & {object.get(r, "customer", "trislab"), "trislab"}) == 0
+	msg := sprintf("catalog/repos.yaml: the hostname %v of the site %v is in %v, which belongs to another customer (07 section 3.2)", [e.hostname, repo, d])
+}
+
 # ---- tenants.yaml (07 sections 2 and 3) ----
 
 deny contains msg if {
@@ -316,7 +399,7 @@ deny contains msg if {
 	msg := sprintf("catalog/tenants.yaml: hostnames[%d] of %v on %v is in a sandbox landing zone, which is always protected: remove access: public (07 section 3.3)", [i, name, stamp])
 }
 
-all_fqdns := [h.fqdn | some [_, _, _, _, h] in hostnames]
+all_fqdns := array.concat([h.fqdn | some [_, _, _, _, h] in hostnames], pages_fqdns)
 
 deny contains msg if {
 	some f in {f | some f in all_fqdns}

@@ -10,6 +10,10 @@ terraform {
       source  = "azure/azapi"
       version = "~> 2.6"
     }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 5.28"
+    }
   }
 }
 
@@ -20,3 +24,9 @@ provider "github" {}
 # The workflows sign in as spn-global-plan or spn-global-apply through
 # ARM_CLIENT_ID, ARM_TENANT_ID and ARM_USE_OIDC.
 provider "azapi" {}
+
+# Creates the deploy tokens of the sites on Cloudflare Pages (pages.tf), signed
+# in through CLOUDFLARE_API_TOKEN as global/edge is: the read-only token on
+# plan, the edit token of the Environment global on apply (16-secrets.md
+# section 7).
+provider "cloudflare" {}
