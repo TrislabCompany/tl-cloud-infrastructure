@@ -47,7 +47,7 @@ slug := `^[a-z0-9]+(-[a-z0-9]+)*$`
 
 fqdn := `^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$`
 
-# Field rules per list: a pattern for a string, or "cidr", "array", "object".
+# Field rules per list: a pattern for a string, or "cidr", "array", "object", "boolean".
 schemas := {
 	"owners": {"file": "owners.yaml", "section": 9, "required": {"slug", "kind", "code", "state"}, "fields": {
 		"slug": slug, "kind": `^(customer|product)$`, "code": `^[a-z]{2,3}$`, "state": `^(active|retired)$`,
@@ -60,7 +60,7 @@ schemas := {
 		"maintainers": "array", "state": `^(active|archived)$`, "archived_on": `^[0-9]{4}-[0-9]{2}-[0-9]{2}$`,
 	}},
 	"domains": {"file": "tenants.yaml", "section": 2, "required": {"name", "owner"}, "fields": {
-		"name": fqdn, "owner": slug, "redirects": "array",
+		"name": fqdn, "owner": slug, "redirects": "array", "waf_rate_limit": "boolean",
 	}},
 	"tenants": {"file": "tenants.yaml", "section": 2, "required": {"name", "customer", "stamp"}, "fields": {
 		"name": `^[a-z0-9-]{1,40}$`, "customer": slug, "stamp": `^[a-z0-9-]+/[a-z0-9-]+$`, "hostnames": "array",
@@ -140,8 +140,10 @@ valid("object", value) if is_object(value)
 
 valid("cidr", value) if cidr(value)
 
+valid("boolean", value) if is_boolean(value)
+
 valid(rule, value) if {
-	not rule in {"array", "object", "cidr"}
+	not rule in {"array", "object", "cidr", "boolean"}
 	is_string(value)
 	regex.match(rule, value)
 }
