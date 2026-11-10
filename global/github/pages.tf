@@ -17,23 +17,20 @@ locals {
         repo        = repo
         environment = e.name
         production  = e.name == "production"
-        public      = try(e.access, "protected") == "public"
         hostname    = e.hostname
       }
     }
   ]...)
 
-  # ROBOTS_INDEX lets search engines index a public production only.
+  # No variable switches indexing: since template-website/v0.3.0 no build is
+  # marked noindex, and Cloudflare Access keeps dev and staging away from search engines.
   pages_variables = merge([
     for key, e in local.pages_environments : {
-      for name, value in merge(
-        {
-          CLOUDFLARE_ACCOUNT_ID = var.cloudflare_account_id
-          PAGES_PROJECT         = e.repo
-          SITE_URL              = "https://${e.hostname}"
-        },
-        e.production && e.public ? { ROBOTS_INDEX = "true" } : {},
-      ) : "${key}/${name}" => { environment = key, name = name, value = value }
+      for name, value in {
+        CLOUDFLARE_ACCOUNT_ID = var.cloudflare_account_id
+        PAGES_PROJECT         = e.repo
+        SITE_URL              = "https://${e.hostname}"
+      } : "${key}/${name}" => { environment = key, name = name, value = value }
     }
   ]...)
 }
