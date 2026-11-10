@@ -142,14 +142,18 @@ def changed_roots(base, head):
                     roots.add(("global/edge", None))
         elif f == "catalog/cloudflare-ips.yaml":
             roots |= {(s, None) for s in folders(both, "stamps/", 2)}
-        elif f == "catalog/tenants.yaml":
+        elif f == "catalog/domains.yaml":
             roots.add(("global/edge", None))
-            def tenants(doc):
+            def stamp_tenants(doc):
                 by_stamp = {}
-                for t in doc.get("tenants") or []:
+                for t in doc.get("stamp_tenants") or []:
                     by_stamp.setdefault(t.get("stamp"), []).append(json.dumps(t, sort_keys=True))
                 return {s: sorted(v) for s, v in by_stamp.items()}
-            roots |= {(f"stamps/{s}", None) for s in stamps_by_entries(f, tenants) if s}
+            roots |= {(f"stamps/{s}", None) for s in stamps_by_entries(f, stamp_tenants) if s}
+        elif f == "catalog/products.yaml":
+            # Tenants, products, owner codes, repositories, Pages environments and client groups.
+            roots |= {("global/github", None), ("global/edge", None), ("platform/azure/identity", None)}
+            roots |= {("landing-zones/_root", lz) for lz in landing_zones(both)}
         elif f == "catalog/ipam.yaml":
             old, new = read_yaml(merge_base, f) or {}, read_yaml(head, f) or {}
             hubs = lambda d: {h.get("name"): h for h in d.get("hubs") or []}
@@ -176,10 +180,6 @@ def changed_roots(base, head):
                     doc = read_yaml(head, path) or read_yaml(merge_base, path) or {}
                     if doc.get("cloud") == cloud:
                         roots.add(("landing-zones/_root", lz))
-        elif f == "catalog/owners.yaml":
-            roots.add(("platform/azure/identity", None))
-        elif f == "catalog/repos.yaml":
-            roots.add(("global/github", None))
         # policy/**, .github/**, renovate.json and everything else plan no root.
 
     def exists(item):
