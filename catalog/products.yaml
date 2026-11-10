@@ -47,9 +47,18 @@ tenants:
           - { name: dev, hostname: dev-corporate-site.trislab.com }
           - { name: staging, hostname: staging-corporate-site.trislab.com }
           - { name: production, hostname: trislab.com, access: public }
+      - slug: dragonja
+        repo: trislab-website-dragonja
+        template: tl-template-website
+        maintainers: [tl-janskof]
+        state: active
+        domain: dragonja.si
+        environments:
+          - { name: dev, hostname: dev.dragonja.si }
+          - { name: staging, hostname: staging.dragonja.si }
   - slug: dragonja
     code: dra
-    state: active
+    state: retired             # Trislab publishes dragonja.si itself, as its product dragonja
     products: []
   - slug: juskoski
     code: jus
