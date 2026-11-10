@@ -1,11 +1,15 @@
 # The records trislab.com held at domenca.com before Cloudflare (10-roadmap.md
 # section 8, PR 1); the web names are proxied. 212.44.101.122 is the hosting,
-# and mail goes to Google Workspace. When the site moves to the platform, its
-# records change here.
+# and mail goes to Google Workspace.
 
-# The corporate site and the hosting.
-apex: { name: trislab.com, type: A, content: 212.44.101.122, proxied: true }
+# The corporate site is the production of the Pages site
+# trislab-website-corporate-site: its apex record comes from pages in
+# catalog/repos.yaml (pages.tf). www and prod-corporate-site only carry the
+# redirects to trislab.com in catalog/tenants.yaml.
 www: { name: www.trislab.com, type: CNAME, content: trislab.com, proxied: true }
+prod-corporate-site: { name: prod-corporate-site.trislab.com, type: CNAME, content: trislab.com, proxied: true }
+
+# The hosting.
 mail: { name: mail.trislab.com, type: A, content: 212.44.101.122 }
 ftp: { name: ftp.trislab.com, type: A, content: 212.44.101.122 }
 cpanel: { name: cpanel.trislab.com, type: A, content: 212.44.101.122, proxied: true }
