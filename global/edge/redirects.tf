@@ -1,4 +1,4 @@
-# The permanent host redirects of each domain in catalog/tenants.yaml
+# The permanent host redirects of each domain in catalog/domains.yaml
 # (domains[].redirects; 07-catalog-and-ipam.md section 2.1.1, ADR 0057): one
 # Single Redirects ruleset per zone, run at the edge before any origin. The
 # Free plan allows 10 such rules per zone. A source host must be a proxied

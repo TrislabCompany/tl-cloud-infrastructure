@@ -50,7 +50,7 @@ An experiment is ended with `landing-zone-decommission` and `hold_days: 0` (or b
    - **`clean-up`:**
      - `git rm landing-zones/<lz>.yaml`;
      - delete the landing zone's entry under `landing_zones` in `catalog/ipam.yaml`, which frees the range;
-     - if the owner is being offboarded (ask), set its `state: retired` in `catalog/owners.yaml`. Never delete it.
+     - if the owner is being offboarded (ask), set its `state: retired` of the tenant in `catalog/products.yaml`. Never delete it.
 5. **Check and open the PR** ([shared steps 4 and 5](../_shared/pr.md#4-check)).
    - **Titles:**
      - "Cancel the landing zone <lz>";

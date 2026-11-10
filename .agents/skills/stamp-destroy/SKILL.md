@@ -1,6 +1,6 @@
 ---
 name: stamp-destroy
-description: Destroy a stamp in tl-cloud-infrastructure — after its data is exported, delete its folder stamps/<lz>/<folder>, its /27 in catalog/ipam.yaml and its tenant and hostnames in catalog/tenants.yaml — as one PR opened with the user's own gh credentials; the pipeline plans the destroy, and global deletes its DNS records, Access applications and the app repository's Environment. Use when the user asks to destroy, delete, remove, deprovision, tear down or shut down a stamp or an app environment such as dev, staging, demo or prod.
+description: Destroy a stamp in tl-cloud-infrastructure — after its data is exported, delete its folder stamps/<lz>/<folder>, its /27 in catalog/ipam.yaml and its tenant and hostnames in catalog/domains.yaml (stamp_tenants) — as one PR opened with the user's own gh credentials; the pipeline plans the destroy, and global deletes its DNS records, Access applications and the app repository's Environment. Use when the user asks to destroy, delete, remove, deprovision, tear down or shut down a stamp or an app environment such as dev, staging, demo or prod.
 metadata:
   owner: infrastructure
 ---
@@ -29,7 +29,7 @@ Follow [the shared steps](../_shared/pr.md). The rules are in [AGENTS.md](../../
 2. **Read the stamp:**
    - `stamps/<lz>/<folder>/stamp.yaml`;
    - its range in `catalog/ipam.yaml`;
-   - its tenants in `catalog/tenants.yaml`;
+   - its `stamp_tenants` in `catalog/domains.yaml`;
    - the deployments it runs: `gh api "repos/TrislabCompany/<repo>/deployments?environment=<environment>&per_page=1" --jq '.[0].ref'`.
 3. **Warnings,** each needing an explicit yes:
    - **Custom hostnames:** a tenant hostname that isn't the default `<env>-<product>…trislab.com` (for example `trislab.com`) stops answering. Ask whether it should move to another stamp first: [`hostname-create`](../hostname-create/SKILL.md) on the new stamp.
@@ -39,7 +39,7 @@ Follow [the shared steps](../_shared/pr.md). The rules are in [AGENTS.md](../../
 5. **Write**, on branch `destroy-<lz>-<folder>`:
    - `git rm -r stamps/<lz>/<folder>`;
    - **`catalog/ipam.yaml`:** delete `<folder>: <range>` under the landing zone. If it was the only stamp, delete the then-empty `stamps:` key too;
-   - **`catalog/tenants.yaml`:** delete every tenant entry with `stamp: <lz>/<folder>`.
+   - **`catalog/domains.yaml`:** delete every `stamp_tenants` entry with `stamp: <lz>/<folder>`.
 6. **Check and open the PR** ([shared steps 4 and 5](../_shared/pr.md#4-check)).
    - **Title:** "Destroy the stamp <stamp code> (<lz>/<folder>)".
    - **Body:**

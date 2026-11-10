@@ -1,10 +1,14 @@
-# One Cloudflare zone per entry of domains in catalog/tenants.yaml, in SSL mode
+# One Cloudflare zone per entry of domains in catalog/domains.yaml, in SSL mode
 # Full (strict) (ADR 0027). Its nameservers, and no others, are listed at the
 # registrar by hand (N11; 11-onboarding.md section 7).
 
 locals {
-  catalog = yamldecode(file("${path.module}/../../catalog/tenants.yaml"))
+  catalog = yamldecode(file("${path.module}/../../catalog/domains.yaml"))
   domains = { for d in local.catalog.domains : d.name => d }
+
+  # Tenants and their products (catalog/products.yaml), read once for pages.tf
+  # and records.tf.
+  tenants = yamldecode(file("${path.module}/../../catalog/products.yaml")).tenants
 }
 
 resource "cloudflare_zone" "this" {

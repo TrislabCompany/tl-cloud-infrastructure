@@ -1,6 +1,6 @@
 ---
 name: hostname-delete
-description: Delete a custom hostname from a stamp in tl-cloud-infrastructure — remove it from the tenant's hostnames in catalog/tenants.yaml and, when it should point elsewhere again, add its outside record to global/edge/records/<zone>/ — as one PR opened with the user's own gh credentials; the stamp unbinds it and global/edge deletes its DNS records. Use when the user asks to delete, remove, detach, unbind or deprovision a hostname or domain from a stamp, or to point a domain back to another host.
+description: Delete a custom hostname from a stamp in tl-cloud-infrastructure — remove it from the tenant's hostnames in catalog/domains.yaml and, when it should point elsewhere again, add its outside record to global/edge/records/<zone>/ — as one PR opened with the user's own gh credentials; the stamp unbinds it and global/edge deletes its DNS records. Use when the user asks to delete, remove, detach, unbind or deprovision a hostname or domain from a stamp, or to point a domain back to another host.
 metadata:
   owner: infrastructure
 ---
@@ -28,7 +28,7 @@ Follow [the shared steps](../_shared/pr.md). The rules are in [AGENTS.md](../../
    - If it is a domain root that `redirects` point to (for example `www.trislab.com → trislab.com`), say that the redirect then leads nowhere unless `point to` is given.
 3. **Show and ask** ([shared step 2](../_shared/pr.md#2-show-then-ask)): the name stops answering at the apply, unless `point to` is given.
 4. **Write**, on branch `delete-hostname-<fqdn with dots as dashes>`.
-   - **`catalog/tenants.yaml`:** delete the hostname's line. Keep the tenant and its other hostnames.
+   - **`catalog/domains.yaml`:** delete the hostname's line. Keep the tenant and its other hostnames.
    - **With `point to`:** add a line to `global/edge/records/<zone>/<zone>.yaml`, in the file's style:
 
      ```yaml

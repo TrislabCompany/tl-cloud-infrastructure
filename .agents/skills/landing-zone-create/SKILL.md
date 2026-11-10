@@ -34,13 +34,13 @@ Follow [the shared steps](../_shared/pr.md). The rules are in [AGENTS.md](../../
 ## Steps
 
 1. **Preflight** ([shared step 1](../_shared/pr.md#1-preflight)).
-2. **Read the state:** `catalog/owners.yaml`, `regions.yaml`, `ipam.yaml`, `landing-zones/*.yaml`, `platform/azure/identity/groups.tf`.
+2. **Read the state:** `catalog/products.yaml`, `regions.yaml`, `ipam.yaml`, `landing-zones/*.yaml`, `platform/azure/identity/groups.tf`.
 3. **Check the owner:**
-   - `cust-<code>`: an `active` customer with that `code` in `owners.yaml`.
-   - `prdt-<code>`: an `active` product with that `code`.
+   - `cust-<code>`: an `active` tenant with that `code` in `products.yaml`.
+   - `prdt-<code>`: an `active` product with that `code` in `products.yaml`.
    - `products` and experiments need none.
    - A missing owner is onboarding, not this skill. Stop, and say the owner entry comes first.
-   - For a customer, also check that `grp-cust-<code>-admins` exists: `az ad group show -g grp-cust-<code>-admins --query id -o tsv`. If it doesn't, say that the customer's sandbox Access needs it.
+   - For a customer, also check that `grp-cust-<code>-admins` exists: `az ad group show -g grp-cust-<code>-admins --query id -o tsv`. If it doesn't, say that the customer's sandbox Access needs it: `platform/azure/identity` creates it for every active client tenant.
 4. **Build the name:**
    - `<scope>-<envtype>-<region code>`. If that name is in `landing-zones/` or `ipam.yaml`, or was ever used, add `-02`, `-03`, … (never reused). Check `git log --all --oneline -- landing-zones/<name>.yaml` for earlier use.
    - Experiments: `exp-<topic>`.

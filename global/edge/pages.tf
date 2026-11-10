@@ -1,4 +1,5 @@
-# The sites on Cloudflare Pages, from pages in catalog/repos.yaml: one Direct
+# The sites on Cloudflare Pages, the products with environments in
+# catalog/products.yaml: one Direct
 # Upload project per repository, deployed by the repository's own workflows
 # with wrangler. Each environment is a Pages branch of the same name, served
 # on its hostname: production is the project's production branch, and dev or
@@ -7,14 +8,15 @@
 # names, which serve the same files.
 
 locals {
-  repos_catalog = yamldecode(file("${path.module}/../../catalog/repos.yaml"))
-
-  # The owner of a repository's Access policy: its customer, or trislab.
-  repo_owners = { for r in local.repos_catalog.repos : r.name => try(r.customer, "trislab") }
-
-  pages = {
-    for p in try(local.repos_catalog.pages, []) : p.repo => merge(p, { owner = lookup(local.repo_owners, p.repo, "trislab") })
-  }
+  # owner is the tenant's code, as for the hostnames of stamps (records.tf): it
+  # names the Access policy, which admits grp-cust-<code>-admins. trislab, the
+  # tenant without a code, is trislab.
+  pages = merge([
+    for t in local.tenants : {
+      for p in t.products : p.repo => { repo = p.repo, environments = p.environments, owner = try(t.code, "trislab") }
+      if try(p.environments, null) != null
+    }
+  ]...)
 
   # By FQDN, with its zone, as for the hostnames of stamps (records.tf).
   pages_hostnames = merge([
@@ -58,6 +60,16 @@ resource "cloudflare_dns_record" "pages" {
   ttl      = 1
 
   depends_on = [cloudflare_pages_domain.this]
+
+  # A hostname of a site is a CNAME to Pages, so no A, AAAA or CNAME record of
+  # global/edge/records/ may have its name. MX, TXT and the like may: they
+  # share the apex with it.
+  lifecycle {
+    precondition {
+      condition     = length([for r in local.records : r if r.name == each.key && contains(["A", "AAAA", "CNAME"], r.type)]) == 0
+      error_message = "${each.key} is a hostname of a site on Cloudflare Pages in catalog/products.yaml, so global/edge/records/ must not also hold an A, AAAA or CNAME record for it. Delete the record, or the environment."
+    }
+  }
 }
 
 # trislab.com moved from the hosting (records/trislab.com) to the production of

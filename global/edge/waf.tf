@@ -4,7 +4,7 @@
 # managed here. A zone that serves no stamp hostname gets no custom rule: its
 # proxied names are sites on outside hosting, which may serve PHP. It gets the
 # rate limit only when its domain sets waf_rate_limit: true in
-# catalog/tenants.yaml, so the outside sites of a zone such as trislab.com keep
+# catalog/domains.yaml, so the outside sites of a zone such as trislab.com keep
 # it while the zone has no stamp (07 section 2.1).
 #
 # The Free plan allows 5 custom rules and 1 rate limiting rule per zone. Each
@@ -60,7 +60,7 @@ resource "cloudflare_ruleset" "waf_custom" {
 # fixes the period and the timeout at 10 seconds and allows only the path and
 # verified bot fields, so the rule covers every proxied name of the zone, not
 # only the stamp hostnames. That is why a zone can keep it without stamps
-# (waf_rate_limit in catalog/tenants.yaml). Verified bots, search engines among
+# (waf_rate_limit in catalog/domains.yaml). Verified bots, search engines among
 # them, are left out.
 resource "cloudflare_ruleset" "waf_rate_limit" {
   for_each = local.rate_limit_zones

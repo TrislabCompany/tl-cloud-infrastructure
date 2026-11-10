@@ -1,6 +1,6 @@
 ---
 name: stamp-create
-description: Create a stamp (one Environment of an app, e.g. dev, staging or prod) in an existing landing zone of tl-cloud-infrastructure — write stamps/<lz>/<folder>/stamp.yaml, generate main.tf with the pinned tl-platform generator, lock the providers, choose its network mode (managed by default; a /27 in catalog/ipam.yaml only for vnet) and add its tenant with the default hostname <env>-<product>.trislab.com (public or protected) to catalog/tenants.yaml — as one PR opened with the user's own gh credentials. Use when the user asks to create, add, provision, deploy infrastructure for or set up a stamp, an environment such as dev, test, staging, demo or prod for an app, or a production stamp.
+description: Create a stamp (one Environment of an app, e.g. dev, staging or prod) in an existing landing zone of tl-cloud-infrastructure — write stamps/<lz>/<folder>/stamp.yaml, generate main.tf with the pinned tl-platform generator, lock the providers, choose its network mode (managed by default; a /27 in catalog/ipam.yaml only for vnet) and add its tenant with the default hostname <env>-<product>.trislab.com (public or protected) to catalog/domains.yaml (stamp_tenants) — as one PR opened with the user's own gh credentials. Use when the user asks to create, add, provision, deploy infrastructure for or set up a stamp, an environment such as dev, test, staging, demo or prod for an app, or a production stamp.
 metadata:
   owner: infrastructure
 ---
@@ -23,9 +23,9 @@ Follow [the shared steps](../_shared/pr.md). The rules are in [AGENTS.md](../../
 | Input | Required | Rule |
 | --- | --- | --- |
 | `lz` | yes | An `active`, non-experiment landing zone in `landing-zones/` |
-| `product` | yes | An `active` product slug in `catalog/owners.yaml`, such as `corporate-site` |
+| `product` | yes | An `active` product slug with a `code` in `catalog/products.yaml`, such as `corporate-site` |
 | `environment` | yes | In a prod landing zone, only `prod`. In a sandbox one: `dev`, `test`, `uat`, `perf`, `demo`, `staging`, or `pr<n>` (which needs `ttl`) |
-| `apps` | yes | Each with `name` (2–10 characters), `repo` (an `active` entry in `catalog/repos.yaml`), `ingress` (`external`, `internal` or `none`), `port`, and `caps` (`cpu`, `memory`, `max_replicas`). Default: copy the apps of the product's existing stamp, for example `stamps/products-sandbox-neu/corporate-site-dev/stamp.yaml` |
+| `apps` | yes | Each with `name` (2–10 characters), `repo` (the `repo` of an `active` product in `catalog/products.yaml`), `ingress` (`external`, `internal` or `none`), `port`, and `caps` (`cpu`, `memory`, `max_replicas`). Default: copy the apps of the product's existing stamp, for example `stamps/products-sandbox-neu/corporate-site-dev/stamp.yaml` |
 | `tenancy` | yes | `dedicated` (default, and the only choice in a customer landing zone) or `shared` |
 | `network` | no | `managed` (default) or `vnet`. `vnet` is required in a `regulated` landing zone, with `zone_redundant: true`, and when an app reaches a private endpoint or a private database through the spoke. `managed` has no subnet, load balancer or public IP of the stamp's, which saves about EUR 20 a month (ADR 0058). Needs `aca-app` v1.2.0 or later; an older version is always `vnet` |
 | `version` | no | The `aca-app` release. Default: the newest tag `aca-app/v*` in `tl-platform`. Show it next to the version the product's other stamps pin |
@@ -43,13 +43,13 @@ Follow [the shared steps](../_shared/pr.md). The rules are in [AGENTS.md](../../
    - With `network: managed`, the landing zone isn't `archetype: regulated`. Otherwise ask whether to use `vnet`.
 3. **Compute:**
    - **Folder:** `<product>-<environment>`, or `<product>` alone in a prod landing zone, for example `stamps/products-prod-neu/corporate-site`.
-   - **Stamp code:** `<owner code>-<product code>-<environment>`. `<owner code>` is `shr` in `products-*` and the customer's code in `cust-*`, and `<product code>` is the product's `code` in `owners.yaml`. Example: `shr-web-prod`.
+   - **Stamp code:** `<owner code>-<product code>-<environment>`. `<owner code>` is `shr` in `products-*` and the customer's code in `cust-*`, and `<product code>` is the product's `code` in `products.yaml`. Example: `shr-web-prod`.
    - **Range,** only with `network: vnet`: `python .agents/skills/_shared/ipam.py stamp <lz>` gives the lowest free aligned /27. A Dedicated workload profile needs a /26 or larger (`--prefix 26`). This template allows only `Consumption`.
    - **Default hostname** (first app with `ingress: external`):
      - in `products-*` and `prdt-*`: `<environment>-<product>.trislab.com`;
      - in `cust-<code>-*`: `<environment>-<product>-<customer slug>.trislab.com`;
-     - the first label is at most 63 characters, and the hostname must not already be in `catalog/tenants.yaml`.
-     - Every other external app gets a derived hostname (`-<app>` added to the first label). `global/edge` makes it; it is never written in `tenants.yaml`.
+     - the first label is at most 63 characters, and the hostname must not already be in `stamp_tenants` of `catalog/domains.yaml`.
+     - Every other external app gets a derived hostname (`-<app>` added to the first label). `global/edge` makes it; it is never written in `stamp_tenants`.
    - **State account:** `gh variable get STATE_ACCOUNT -R TrislabCompany/tl-cloud-infrastructure`, for example `stplatformtfstate6884`.
 4. **Show and ask** ([shared step 2](../_shared/pr.md#2-show-then-ask)):
    - lz, folder, stamp code, environment;
@@ -91,7 +91,7 @@ Follow [the shared steps](../_shared/pr.md). The rules are in [AGENTS.md](../../
      - If there is none: `tofu -chdir=stamps/<lz>/<folder> init -backend=false`, then `tofu -chdir=stamps/<lz>/<folder> providers lock -platform=linux_amd64`, then delete `stamps/<lz>/<folder>/.terraform`.
      - The folder may hold only `stamp.yaml`, `main.tf` and `.terraform.lock.hcl`: `stamp-check` fails on anything else.
    - **`catalog/ipam.yaml`,** only with `network: vnet`: under the landing zone's entry, add `stamps:` if it is missing, then `<folder>: <the /27>`. A `managed` stamp has no entry: `policy/catalog.rego` denies one.
-   - **`catalog/tenants.yaml`:** append under `tenants` (one tenant on a dedicated stamp):
+   - **`catalog/domains.yaml`:** append under `stamp_tenants` (one tenant on a dedicated stamp):
 
      ```yaml
        - name: <product>
@@ -118,6 +118,6 @@ Hostnames of stamps in a sandbox landing zone are always behind Cloudflare Acces
 
 - **Prod, the stamp's own `<env>-<product>` hostname:** write `{ fqdn: …, app: …, access: protected }`, so the same people who test the sandbox test prod before the public hostname goes live.
 - **Sandbox:** write no `access` field. `policy/catalog.rego` rejects `access: public` there.
-- **Derived hostnames** of further external apps (`<default>-<app>`) are not in `tenants.yaml`: in prod they are public. If one must be protected, write it in `tenants.yaml` with `access: protected` instead of relying on the derived form.
+- **Derived hostnames** of further external apps (`<default>-<app>`) are not in `stamp_tenants`: in prod they are public. If one must be protected, write it in `stamp_tenants` with `access: protected` instead of relying on the derived form.
 
 `global/edge/zero-trust.tf` creates one Access application per protected hostname, in the same `global` apply that creates its records, so a protected hostname is never public.
