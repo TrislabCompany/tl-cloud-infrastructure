@@ -441,7 +441,7 @@ deny contains msg if {
 # is its tenant's or trislab's.
 deny contains msg if {
 	some [_, p] in product_rows
-	not is_string(p.domain)
+	not p.domain
 	is_array(p.environments)
 	some e in p.environments
 	valid_pages_environment(e)
@@ -451,7 +451,7 @@ deny contains msg if {
 
 deny contains msg if {
 	some [_, p] in product_rows
-	not is_string(p.domain)
+	not p.domain
 	is_array(p.environments)
 	some e in p.environments
 	valid_pages_environment(e)
@@ -463,7 +463,7 @@ deny contains msg if {
 
 deny contains msg if {
 	some [t, p] in product_rows
-	not is_string(p.domain)
+	not p.domain
 	is_array(p.environments)
 	some e in p.environments
 	valid_pages_environment(e)
