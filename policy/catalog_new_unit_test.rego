@@ -317,7 +317,7 @@ test_hostname_app_must_be_an_external_app_of_the_stamp if {
 }
 
 test_app_repo_must_be_an_active_repository if {
-	denies(with_stamp("products-sandbox-neu/construction-dev", stamp("construction", "trislab-saas-hunting")), "deploys from trislab-saas-hunting, which is not an active product repository")
+	denies(with_stamp("products-sandbox-neu/construction-dev", stamp("construction", "trislab-saas-hunting")), "deploys from trislab-saas-hunting, which is not an active repository")
 	denies(with_stamp("products-sandbox-neu/construction-dev", stamp("construction", "okna-capris-webapp-construction")), "deploys from okna-capris-webapp-construction, which is not an active product repository")
 }
 

@@ -167,7 +167,7 @@ test_repo_rules if {
 # ---- tenants.yaml ----
 
 test_domain_owner_must_be_customer_or_trislab if {
-	denies(with_list("domains", array.concat(good.domains, [{"name": "x.example", "owner": "construction"}])), "the domain x.example has the owner construction")
+	denies(with_list("domains", array.concat(good.domains, [{"name": "x.example", "owner": "construction"}])), "the domain x.example has the tenant construction")
 }
 
 test_domain_waf_rate_limit_is_a_boolean if {

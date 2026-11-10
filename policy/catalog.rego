@@ -276,8 +276,10 @@ deny contains msg if {
 	msg := sprintf("catalog/products.yaml: the tenant trislab is the platform's own owner and has no code, not %v (07 section 9)", [t.code])
 }
 
-# A product's slug is unique within its tenant, not across tenants.
+# A product's slug is unique within its tenant, not across tenants. The old
+# shape lists repositories, and several of them may name one product.
 deny contains msg if {
+	new_shape
 	some [t, p] in product_rows
 	count([q | some [u, q] in product_rows; u.slug == t.slug; q.slug == p.slug]) > 1
 	msg := sprintf("catalog/products.yaml: the tenant %v has the product %v more than once (07 section 11)", [t.slug, p.slug])
@@ -692,7 +694,7 @@ deny contains msg if {
 	some stamp, s in stamp_yaml
 	some a in s.apps
 	not a.repo in {r.name | some r in repos; r.state == "active"}
-	msg := sprintf("stamps/%s/stamp.yaml: the app %v deploys from %v, which is not an active product repository in catalog/products.yaml (07 section 7)", [stamp, a.name, a.repo])
+	msg := sprintf("stamps/%s/stamp.yaml: the app %v deploys from %v, which is not an active repository of a product in the catalog (07 section 7)", [stamp, a.name, a.repo])
 }
 
 # ---- ipam.yaml (07 sections 5 and 6) ----
