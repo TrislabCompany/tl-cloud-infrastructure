@@ -7,9 +7,14 @@
 # counts as present. GCP labels wait for the first GCP customer (ADR 0008).
 package tags
 
-default owners := []
+import data.catalog_lib
 
-owners := data.pr.owners
+default pr_data := {}
+
+pr_data := data.pr
+
+# The owner codes of either catalog shape (catalog_lib.rego).
+owners := catalog_lib.owners_n(pr_data)
 
 required := ["Product", "Customer", "EnvironmentType", "EnvironmentName"]
 
@@ -46,7 +51,7 @@ deny contains msg if {
 	some tag, values in allowed
 	is_string(tags[tag])
 	not tags[tag] in values
-	msg := sprintf("%s: the tag %s is %q, not one of %v (03 section 9, catalog/owners.yaml)", [address, tag, tags[tag], sort(values)])
+	msg := sprintf("%s: the tag %s is %q, not one of %v (03 section 9, catalog/products.yaml)", [address, tag, tags[tag], sort(values)])
 }
 
 # dev, test, uat, perf, demo, staging, pr<n> and prod name a stamp's environment;

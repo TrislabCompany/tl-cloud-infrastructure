@@ -4,36 +4,48 @@
 #
 # The rules read only data, so they give the same result for every root,
 # except the data access group rule at the end, which reads the plan. The
-# PR's catalog/ comes as data.pr and main's as data.main (08 section 3). A file
-# that doesn't exist yet passes, and so do the rules that compare the PR with
-# main while main has no catalog/. Each stamps/<lz>/<folder>/stamp.yaml comes
-# as data.<side>.stamp_yaml["<lz>/<folder>"]. The default hostname rows and the
-# custom hostname rows come before the second stamp (10 section 13).
+# PR's catalog/ comes as data.pr and main's as data.main (08 section 3).
+#
+# The catalog has two shapes and both are accepted (catalog_lib.rego): the old
+# owners.yaml, repos.yaml and tenants.yaml, and the new products.yaml
+# (tenants with products) and domains.yaml. catalog_lib.rego turns either into
+# one normalised view, and every rule below reads only that view: tenants,
+# owners, repos, domains and stamp_tenants. Only the schema of the raw files
+# and the few rules about a raw old list (repos, pages) depend on the shape.
+# A file that doesn't exist yet passes, and so do the rules that compare the
+# PR with main while main has no catalog/. The comparison with main
+# normalises main the same way, so old to old, old to new and new to new all
+# compare the same lists and never fail falsely or skip. Each
+# stamps/<lz>/<folder>/stamp.yaml comes as data.<side>.stamp_yaml["<lz>/<folder>"].
+# The default hostname rows and the custom hostname rows come before the second
+# stamp (10 section 13).
 package catalog
 
-default owners := []
+import data.catalog_lib
 
-owners := data.pr.owners
+default pr_data := {}
+
+pr_data := data.pr
+
+default main_data := {}
+
+main_data := data.main
+
+new_shape := catalog_lib.is_new(pr_data)
+
+tenants := catalog_lib.tenants_n(pr_data)
+
+owners := catalog_lib.owners_n(pr_data)
+
+repos := catalog_lib.repos(tenants)
+
+domains := catalog_lib.domains_n(pr_data)
+
+stamp_tenants := catalog_lib.stamp_tenants_n(pr_data)
 
 default regions := []
 
 regions := data.pr.regions
-
-default repos := []
-
-repos := data.pr.repos
-
-default pages := []
-
-pages := data.pr.pages
-
-default domains := []
-
-domains := data.pr.domains
-
-default tenants := []
-
-tenants := data.pr.tenants
 
 default hubs := []
 
@@ -53,11 +65,16 @@ fqdn := `^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$`
 
 # Field rules per list: a pattern for a string, or "cidr", "array", "object", "boolean".
 schemas := {
+	"tenants": {"file": "products.yaml", "section": 9, "required": {"slug", "state", "products"}, "fields": {
+		"slug": slug, "code": `^[a-z]{2,3}$`, "state": `^(active|retired)$`, "products": "array",
+	}},
+	"products": {"file": "products.yaml", "section": 11, "required": {"slug", "repo", "template", "maintainers", "state", "domain"}, "fields": {
+		"slug": slug, "code": `^[a-z]{2,3}$`, "repo": slug, "template": `^tl-template-(website|webapp|saas)$`,
+		"maintainers": "array", "state": `^(active|archived)$`, "archived_on": `^[0-9]{4}-[0-9]{2}-[0-9]{2}$`,
+		"domain": fqdn, "environments": "array",
+	}},
 	"owners": {"file": "owners.yaml", "section": 9, "required": {"slug", "kind", "code", "state"}, "fields": {
 		"slug": slug, "kind": `^(customer|product)$`, "code": `^[a-z]{2,3}$`, "state": `^(active|retired)$`,
-	}},
-	"regions": {"file": "regions.yaml", "section": 10, "required": {"name", "cloud", "code", "state"}, "fields": {
-		"name": slug, "cloud": `^(azure|gcp)$`, "code": `^[a-z0-9]{2,4}$`, "state": `^(active|retired)$`,
 	}},
 	"repos": {"file": "repos.yaml", "section": 11, "required": {"name", "product", "template", "maintainers", "state"}, "fields": {
 		"name": slug, "product": slug, "customer": slug, "template": `^tl-template-(website|webapp|saas)$`,
@@ -66,10 +83,19 @@ schemas := {
 	"pages": {"file": "repos.yaml", "section": 11, "required": {"repo", "environments"}, "fields": {
 		"repo": slug, "environments": "array",
 	}},
-	"domains": {"file": "tenants.yaml", "section": 2, "required": {"name", "owner"}, "fields": {
+	"old_domains": {"label": "domains", "file": "tenants.yaml", "section": 2, "required": {"name", "owner"}, "fields": {
 		"name": fqdn, "owner": slug, "redirects": "array", "waf_rate_limit": "boolean",
 	}},
-	"tenants": {"file": "tenants.yaml", "section": 2, "required": {"name", "customer", "stamp"}, "fields": {
+	"old_tenants": {"label": "tenants", "file": "tenants.yaml", "section": 2, "required": {"name", "customer", "stamp"}, "fields": {
+		"name": `^[a-z0-9-]{1,40}$`, "customer": slug, "stamp": `^[a-z0-9-]+/[a-z0-9-]+$`, "hostnames": "array",
+	}},
+	"regions": {"file": "regions.yaml", "section": 10, "required": {"name", "cloud", "code", "state"}, "fields": {
+		"name": slug, "cloud": `^(azure|gcp)$`, "code": `^[a-z0-9]{2,4}$`, "state": `^(active|retired)$`,
+	}},
+	"domains": {"file": "domains.yaml", "section": 2, "required": {"name", "tenant"}, "fields": {
+		"name": fqdn, "tenant": slug, "redirects": "array", "waf_rate_limit": "boolean",
+	}},
+	"stamp_tenants": {"file": "domains.yaml", "section": 2, "required": {"name", "customer", "stamp"}, "fields": {
 		"name": `^[a-z0-9-]{1,40}$`, "customer": slug, "stamp": `^[a-z0-9-]+/[a-z0-9-]+$`, "hostnames": "array",
 	}},
 	"hubs": {"file": "ipam.yaml", "section": 5, "required": {"name", "cloud", "region", "cidr"}, "fields": {
@@ -80,12 +106,40 @@ schemas := {
 	}},
 }
 
-lists := {
-	"owners": owners, "regions": regions, "repos": repos, "pages": pages, "domains": domains,
-	"tenants": tenants, "hubs": hubs, "landing_zones": landing_zones,
-}
+# [tenant, product] for every product of every tenant.
+product_rows := [[t, p] |
+	some t in tenants
+	is_object(t)
+	is_array(t.products)
+	some p in t.products
+]
+
+# The raw lists of the shape the PR has, checked against their schemas.
+lists := object.union({"regions": regions, "hubs": hubs, "landing_zones": landing_zones}, shape_lists)
+
+shape_lists := {
+	"tenants": object.get(pr_data, "tenants", []),
+	"products": [p | some [_, p] in product_rows],
+	"domains": object.get(pr_data, "domains", []),
+	"stamp_tenants": object.get(pr_data, "stamp_tenants", []),
+} if new_shape
+
+shape_lists := {
+	"owners": object.get(pr_data, "owners", []),
+	"repos": object.get(pr_data, "repos", []),
+	"pages": object.get(pr_data, "pages", []),
+	"old_domains": object.get(pr_data, "domains", []),
+	"old_tenants": object.get(pr_data, "tenants", []),
+} if not new_shape
 
 where(list) := sprintf("catalog/%s", [schemas[list].file])
+
+# The name of a list in a message.
+label_of(list) := object.get(schemas[list], "label", list)
+
+product_slugs := {o.slug | some o in owners; o.kind == "product"}
+
+customer_slugs := {o.slug | some o in owners; o.kind == "customer"}
 
 # Reserved tokens that are not region codes (03 section 3).
 reserved := {
@@ -94,23 +148,21 @@ reserved := {
 	"experiment", "exp", "global", "standard", "regulated", "experiments", "decommissioned",
 }
 
-customer_slugs := {o.slug | some o in owners; o.kind == "customer"}
-
-product_slugs := {o.slug | some o in owners; o.kind == "product"}
+tenant_slugs := {t.slug | some t in tenants; is_object(t)}
 
 # ---- Schema (07 sections 2, 5, 9, 10 and 11) ----
 
 deny contains msg if {
 	some list, entries in lists
 	not is_array(entries)
-	msg := sprintf("%s: %s must be a list (07 section %d)", [where(list), list, schemas[list].section])
+	msg := sprintf("%s: %s must be a list (07 section %d)", [where(list), label_of(list), schemas[list].section])
 }
 
 deny contains msg if {
 	some list, entries in lists
 	some i, entry in entries
 	not is_object(entry)
-	msg := sprintf("%s: %s[%d] must be a map (07 section %d)", [where(list), list, i, schemas[list].section])
+	msg := sprintf("%s: %s[%d] must be a map (07 section %d)", [where(list), label_of(list), i, schemas[list].section])
 }
 
 deny contains msg if {
@@ -119,7 +171,7 @@ deny contains msg if {
 	is_object(entry)
 	some field in schemas[list].required
 	not field in object.keys(entry)
-	msg := sprintf("%s: %s[%d] has no %s (07 section %d)", [where(list), list, i, field, schemas[list].section])
+	msg := sprintf("%s: %s[%d] has no %s (07 section %d)", [where(list), label_of(list), i, field, schemas[list].section])
 }
 
 deny contains msg if {
@@ -128,7 +180,7 @@ deny contains msg if {
 	is_object(entry)
 	some field, _ in entry
 	not schemas[list].fields[field]
-	msg := sprintf("%s: %s[%d] has the unknown field %s (07 section %d)", [where(list), list, i, field, schemas[list].section])
+	msg := sprintf("%s: %s[%d] has the unknown field %s (07 section %d)", [where(list), label_of(list), i, field, schemas[list].section])
 }
 
 deny contains msg if {
@@ -138,7 +190,7 @@ deny contains msg if {
 	some field, value in entry
 	rule := schemas[list].fields[field]
 	not valid(rule, value)
-	msg := sprintf("%s: %s[%d].%s is %v, which is not allowed (07 section %d)", [where(list), list, i, field, value, schemas[list].section])
+	msg := sprintf("%s: %s[%d].%s is %v, which is not allowed (07 section %d)", [where(list), label_of(list), i, field, value, schemas[list].section])
 }
 
 valid("array", value) if is_array(value)
@@ -172,24 +224,24 @@ duplicates(list, key) := {v |
 }
 
 deny contains msg if {
-	some [list, key] in [["owners", "slug"], ["owners", "code"], ["regions", "code"], ["repos", "name"], ["pages", "repo"], ["domains", "name"], ["hubs", "name"], ["landing_zones", "name"]]
+	some [list, key] in [["owners", "slug"], ["owners", "code"], ["repos", "name"], ["pages", "repo"], ["tenants", "slug"], ["products", "repo"], ["regions", "code"], ["domains", "name"], ["old_domains", "name"], ["hubs", "name"], ["landing_zones", "name"]]
 	some v in duplicates(list, key)
 	msg := sprintf("%s: the %s %v is used more than once (07 section %d)", [where(list), key, v, schemas[list].section])
 }
 
-# ---- owners.yaml and regions.yaml (07 sections 9 and 10, 03 section 3) ----
+# ---- Owner and region codes (07 sections 9 and 10, 03 section 3) ----
 
 deny contains msg if {
 	some o in owners
 	o.code in reserved
-	msg := sprintf("catalog/owners.yaml: the code %v of %v is a reserved token (03 section 3)", [o.code, o.slug])
+	msg := sprintf("catalog/products.yaml: the code %v of %v is a reserved token (03 section 3)", [o.code, o.slug])
 }
 
 deny contains msg if {
 	some o in owners
 	some r in regions
 	o.code == r.code
-	msg := sprintf("catalog/owners.yaml: the code %v of %v is also the code of the region %v (03 section 3)", [o.code, o.slug, r.name])
+	msg := sprintf("catalog/products.yaml: the code %v of %v is also the code of the region %v (03 section 3)", [o.code, o.slug, r.name])
 }
 
 deny contains msg if {
@@ -204,35 +256,67 @@ deny contains msg if {
 	msg := sprintf("catalog/regions.yaml: the %v region %v is listed more than once (07 section 10)", [r.cloud, r.name])
 }
 
-# ---- repos.yaml (07 section 11) ----
+# ---- products.yaml: tenants and products (07 sections 9 and 11) ----
 
-# <customer>-<appType>-<product>, with trislab when there is no customer.
+# trislab is the platform's own owner, so it has no code. Every other tenant
+# keeps a required code (07 section 9).
 deny contains msg if {
-	some r in repos
-	is_string(r.template)
-	want := sprintf("%v-%v-%v", [object.get(r, "customer", "trislab"), trim_prefix(r.template, "tl-template-"), r.product])
-	r.name != want
-	msg := sprintf("catalog/repos.yaml: %v must be named %v, from its customer (or trislab), its template and its product (07 section 11)", [r.name, want])
+	some t in tenants
+	is_object(t)
+	t.slug != "trislab"
+	not t.code
+	msg := sprintf("catalog/products.yaml: the tenant %v has no code, which every tenant but trislab needs, 2 or 3 letters (07 section 9)", [t.slug])
 }
 
 deny contains msg if {
-	some r in repos
-	not r.product in product_slugs
-	msg := sprintf("catalog/repos.yaml: %v names the product %v, which is not a product in catalog/owners.yaml (07 section 11)", [r.name, r.product])
+	some t in tenants
+	is_object(t)
+	t.slug == "trislab"
+	t.code
+	msg := sprintf("catalog/products.yaml: the tenant trislab is the platform's own owner and has no code, not %v (07 section 9)", [t.code])
+}
+
+# A product's slug is unique within its tenant, not across tenants. The old
+# shape lists repositories, and several of them may name one product.
+deny contains msg if {
+	new_shape
+	some [t, p] in product_rows
+	count([q | some [u, q] in product_rows; u.slug == t.slug; q.slug == p.slug]) > 1
+	msg := sprintf("catalog/products.yaml: the tenant %v has the product %v more than once (07 section 11)", [t.slug, p.slug])
+}
+
+# The code of a product is only needed when a stamp deploys it.
+deny contains msg if {
+	some [t, p] in product_rows
+	not p.code
+	some stamp, s in stamp_yaml
+	some a in s.apps
+	a.repo == p.repo
+	msg := sprintf("catalog/products.yaml: the product %v of %v has no code, which a product needs once a stamp deploys from its repository, but stamps/%s/stamp.yaml does (07 section 9)", [p.slug, t.slug, stamp])
+}
+
+# An owner slug is looked up by the stamps (a product's, or a client tenant's),
+# and an owner code is never shared.
+deny contains msg if {
+	some key in ["slug", "code"]
+	some v in {o[key] | some o in owners; count([x | some x in owners; x[key] == o[key]]) > 1}
+	msg := sprintf("catalog/products.yaml: the %s %v is used by more than one product or client tenant with a code (07 section 9)", [key, v])
+}
+
+# <tenant>-<appType>-<product>.
+deny contains msg if {
+	some [t, p] in product_rows
+	is_string(p.template)
+	want := sprintf("%v-%v-%v", [t.slug, trim_prefix(p.template, "tl-template-"), p.slug])
+	p.repo != want
+	msg := sprintf("catalog/products.yaml: %v must be named %v, from its tenant, its template and its product (07 section 11)", [p.repo, want])
 }
 
 deny contains msg if {
-	some r in repos
-	r.customer
-	not r.customer in customer_slugs
-	msg := sprintf("catalog/repos.yaml: %v names the customer %v, which is not a customer in catalog/owners.yaml (07 section 11)", [r.name, r.customer])
-}
-
-deny contains msg if {
-	some r in repos
-	is_array(r.maintainers)
-	not valid_maintainers(r.maintainers)
-	msg := sprintf("catalog/repos.yaml: %v needs at least one maintainer, each a GitHub user name (07 section 11)", [r.name])
+	some [_, p] in product_rows
+	is_array(p.maintainers)
+	not valid_maintainers(p.maintainers)
+	msg := sprintf("catalog/products.yaml: %v needs at least one maintainer, each a GitHub user name (07 section 11)", [p.repo])
 }
 
 valid_maintainers(list) if {
@@ -244,17 +328,57 @@ valid_maintainers(list) if {
 }
 
 deny contains msg if {
-	some r in repos
-	r.state == "archived"
-	not r.archived_on
-	msg := sprintf("catalog/repos.yaml: %v is archived and has no archived_on (07 section 11)", [r.name])
+	some [_, p] in product_rows
+	p.state == "archived"
+	not p.archived_on
+	msg := sprintf("catalog/products.yaml: %v is archived and has no archived_on (07 section 11)", [p.repo])
 }
 
-# ---- repos.yaml, pages: sites on Cloudflare Pages (07 section 11) ----
+# A product has one domain, which is in domains and belongs to its tenant.
+deny contains msg if {
+	some [t, p] in product_rows
+	is_string(p.domain)
+	not p.domain in {d.name | some d in domains; is_string(d.name)}
+	msg := sprintf("catalog/products.yaml: the product %v of %v names the domain %v, which is not in catalog/domains.yaml (07 section 3.2)", [p.slug, t.slug, p.domain])
+}
+
+deny contains msg if {
+	some [t, p] in product_rows
+	some d in domains
+	d.name == p.domain
+	d.tenant != t.slug
+	msg := sprintf("catalog/products.yaml: the product %v of %v is on the domain %v, which belongs to the tenant %v (07 section 3.2)", [p.slug, t.slug, d.name, d.tenant])
+}
+
+# ---- Old shape: owners.yaml, repos.yaml and pages (07 section 11) ----
+
+# What only the raw old lists can say. The rules about names, maintainers,
+# archiving, environments and hostnames below read the normalised view.
+
+deny contains msg if {
+	some r in object.get(pr_data, "repos", [])
+	not r.product in product_slugs
+	msg := sprintf("catalog/repos.yaml: %v names the product %v, which is not a product in catalog/owners.yaml (07 section 11)", [r.name, r.product])
+}
+
+deny contains msg if {
+	some r in object.get(pr_data, "repos", [])
+	r.customer
+	not r.customer in customer_slugs
+	msg := sprintf("catalog/repos.yaml: %v names the customer %v, which is not a customer in catalog/owners.yaml (07 section 11)", [r.name, r.customer])
+}
+
+deny contains msg if {
+	some p in object.get(pr_data, "pages", [])
+	not p.repo in {r.name | some r in object.get(pr_data, "repos", []); r.state == "active"; r.template == "tl-template-website"}
+	msg := sprintf("catalog/repos.yaml: the site %v is not an active tl-template-website repository in repos (07 section 11)", [p.repo])
+}
+
+# ---- Environments: sites on Cloudflare Pages (07 section 11) ----
 
 # [repo, i, environment] for every environment of a site.
 pages_environments contains [p.repo, i, e] if {
-	some p in pages
+	some [_, p] in product_rows
 	is_array(p.environments)
 	some i, e in p.environments
 }
@@ -273,90 +397,120 @@ pages_fqdns := [e.hostname | some [_, _, e] in pages_environments; valid_pages_e
 deny contains msg if {
 	some [repo, i, e] in pages_environments
 	not valid_pages_environment(e)
-	msg := sprintf("catalog/repos.yaml: environments[%d] of the site %v must be { name, hostname } with the name dev, staging or production and a lowercase FQDN, and an optional access: public or protected (07 section 11)", [i, repo])
+	msg := sprintf("catalog/products.yaml: environments[%d] of the site %v must be { name, hostname } with the name dev, staging or production and a lowercase FQDN, and an optional access: public or protected (07 section 11)", [i, repo])
+}
+
+# Only production can be public. dev and staging are always behind Cloudflare Access.
+deny contains msg if {
+	some [repo, i, e] in pages_environments
+	is_object(e)
+	e.access == "public"
+	e.name != "production"
+	msg := sprintf("catalog/products.yaml: environments[%d] of the site %v is %v, which is never public: only production can have access: public (07 section 3.3)", [i, repo, e.name])
 }
 
 deny contains msg if {
-	some p in pages
+	some [_, p] in product_rows
 	is_array(p.environments)
 	some n in {e.name | some e in p.environments; is_object(e)}
 	count([e | some e in p.environments; is_object(e); e.name == n]) > 1
-	msg := sprintf("catalog/repos.yaml: the site %v has the environment %v more than once (07 section 11)", [p.repo, n])
+	msg := sprintf("catalog/products.yaml: the site %v has the environment %v more than once (07 section 11)", [p.repo, n])
 }
 
 deny contains msg if {
-	some p in pages
-	not p.repo in {r.name | some r in repos; r.state == "active"; r.template == "tl-template-website"}
-	msg := sprintf("catalog/repos.yaml: the site %v is not an active tl-template-website repository in repos (07 section 11)", [p.repo])
+	some [_, p] in product_rows
+	is_array(p.environments)
+	count(p.environments) > 0
+	not [p.template, p.state] == ["tl-template-website", "active"]
+	msg := sprintf("catalog/products.yaml: %v has environments, which only an active tl-template-website repository can have (07 section 11)", [p.repo])
 }
 
 # A repository deploys either to Cloudflare Pages or to stamps.
 deny contains msg if {
-	some p in pages
+	some [_, p] in product_rows
+	is_array(p.environments)
+	count(p.environments) > 0
 	some stamp, s in stamp_yaml
 	some a in s.apps
 	a.repo == p.repo
-	msg := sprintf("catalog/repos.yaml: the site %v is on Cloudflare Pages, so no stamp may deploy from it, but stamps/%s/stamp.yaml does (07 section 11)", [p.repo, stamp])
+	msg := sprintf("catalog/products.yaml: the site %v is on Cloudflare Pages, so no stamp may deploy from it, but stamps/%s/stamp.yaml does (07 section 11)", [p.repo, stamp])
 }
 
+# A product without a domain (the old shape has none) is checked against the
+# domains: its hostname is in one, at most one label below it, and the domain
+# is its tenant's or trislab's.
 deny contains msg if {
-	some [repo, _, e] in pages_environments
+	some [_, p] in product_rows
+	not p.domain
+	is_array(p.environments)
+	some e in p.environments
 	valid_pages_environment(e)
 	not domain_of(e.hostname)
-	msg := sprintf("catalog/repos.yaml: the hostname %v of the site %v is in no domain of domains in catalog/tenants.yaml (07 section 3.2)", [e.hostname, repo])
+	msg := sprintf("catalog/repos.yaml: the hostname %v of the site %v is in no domain of domains in catalog/tenants.yaml (07 section 3.2)", [e.hostname, p.repo])
 }
 
 deny contains msg if {
-	some [repo, _, e] in pages_environments
+	some [_, p] in product_rows
+	not p.domain
+	is_array(p.environments)
+	some e in p.environments
 	valid_pages_environment(e)
 	d := domain_of(e.hostname)
 	e.hostname != d
 	contains(trim_suffix(e.hostname, concat("", [".", d])), ".")
-	msg := sprintf("catalog/repos.yaml: the hostname %v of the site %v is more than one label below %v (07 section 3)", [e.hostname, repo, d])
+	msg := sprintf("catalog/repos.yaml: the hostname %v of the site %v is more than one label below %v (07 section 3)", [e.hostname, p.repo, d])
 }
 
 deny contains msg if {
-	some [repo, _, e] in pages_environments
+	some [t, p] in product_rows
+	not p.domain
+	is_array(p.environments)
+	some e in p.environments
 	valid_pages_environment(e)
 	d := domain_of(e.hostname)
-	some r in repos
-	r.name == repo
-	owner := {x.owner | some x in domains; x.name == d}
-	count(owner & {object.get(r, "customer", "trislab"), "trislab"}) == 0
-	msg := sprintf("catalog/repos.yaml: the hostname %v of the site %v is in %v, which belongs to another customer (07 section 3.2)", [e.hostname, repo, d])
+	owner := {x.tenant | some x in domains; x.name == d}
+	count(owner & {t.slug, "trislab"}) == 0
+	msg := sprintf("catalog/repos.yaml: the hostname %v of the site %v is in %v, which belongs to another customer (07 section 3.2)", [e.hostname, p.repo, d])
 }
 
-# ---- tenants.yaml (07 sections 2 and 3) ----
+# Every hostname is the product's domain, or exactly one label below it.
+deny contains msg if {
+	some [_, p] in product_rows
+	is_string(p.domain)
+	is_array(p.environments)
+	some e in p.environments
+	valid_pages_environment(e)
+	not redirect_name_in(e.hostname, p.domain)
+	msg := sprintf("catalog/products.yaml: the hostname %v of the site %v is not %v or exactly one label below it (07 section 3)", [e.hostname, p.repo, p.domain])
+}
+
+# ---- domains.yaml: domains and the tenants on stamps (07 sections 2 and 3) ----
 
 deny contains msg if {
 	some d in domains
-	not owner_or_trislab(d.owner)
-	msg := sprintf("catalog/tenants.yaml: the domain %v has the owner %v, which is neither a customer in catalog/owners.yaml nor trislab (07 section 2.1)", [d.name, d.owner])
+	not d.tenant in tenant_slugs
+	msg := sprintf("catalog/domains.yaml: the domain %v has the tenant %v, which is not a tenant in catalog/products.yaml (07 section 2.1)", [d.name, d.tenant])
 }
 
 deny contains msg if {
-	some t in tenants
-	not owner_or_trislab(t.customer)
-	msg := sprintf("catalog/tenants.yaml: the tenant %v on %v has the customer %v, which is neither a customer in catalog/owners.yaml nor trislab (07 section 2.2)", [t.name, t.stamp, t.customer])
+	some t in stamp_tenants
+	not t.customer in tenant_slugs
+	msg := sprintf("catalog/domains.yaml: the tenant %v on %v has the customer %v, which is not a tenant in catalog/products.yaml (07 section 2.2)", [t.name, t.stamp, t.customer])
 }
 
-owner_or_trislab(s) if s == "trislab"
-
-owner_or_trislab(s) if s in customer_slugs
-
 deny contains msg if {
-	some t in tenants
-	count([x | some x in tenants; x.name == t.name; x.stamp == t.stamp]) > 1
-	msg := sprintf("catalog/tenants.yaml: the tenant %v is on %v more than once (07 section 2.2)", [t.name, t.stamp])
+	some t in stamp_tenants
+	count([x | some x in stamp_tenants; x.name == t.name; x.stamp == t.stamp]) > 1
+	msg := sprintf("catalog/domains.yaml: the tenant %v is on %v more than once (07 section 2.2)", [t.name, t.stamp])
 }
 
 # A tenant on a stamp in a customer landing zone belongs to that customer.
 deny contains msg if {
-	some t in tenants
+	some t in stamp_tenants
 	is_string(t.stamp)
 	code := customer_code(t.stamp)
 	not t.customer in {o.slug | some o in owners; o.kind == "customer"; o.code == code}
-	msg := sprintf("catalog/tenants.yaml: the tenant %v on %v must have the customer whose code is %v (07 section 7)", [t.name, t.stamp, code])
+	msg := sprintf("catalog/domains.yaml: the tenant %v on %v must have the customer whose code is %v (07 section 7)", [t.name, t.stamp, code])
 }
 
 customer_code(stamp) := m[0][1] if {
@@ -366,7 +520,7 @@ customer_code(stamp) := m[0][1] if {
 
 # [tenant, stamp, customer, i, hostname] for every hostname.
 hostnames contains [t.name, t.stamp, t.customer, i, h] if {
-	some t in tenants
+	some t in stamp_tenants
 	is_array(t.hostnames)
 	some i, h in t.hostnames
 }
@@ -374,7 +528,7 @@ hostnames contains [t.name, t.stamp, t.customer, i, h] if {
 deny contains msg if {
 	some [name, stamp, _, i, h] in hostnames
 	not valid_hostname(h)
-	msg := sprintf("catalog/tenants.yaml: hostnames[%d] of %v on %v must be { fqdn, app } with a lowercase FQDN and an app name, and an optional access: public or protected (07 section 2.2)", [i, name, stamp])
+	msg := sprintf("catalog/domains.yaml: hostnames[%d] of %v on %v must be { fqdn, app } with a lowercase FQDN and an app name, and an optional access: public or protected (07 section 2.2)", [i, name, stamp])
 }
 
 valid_hostname(h) if {
@@ -396,7 +550,7 @@ deny contains msg if {
 	some [name, stamp, _, i, h] in hostnames
 	contains(split(stamp, "/")[0], "-sandbox-")
 	h.access == "public"
-	msg := sprintf("catalog/tenants.yaml: hostnames[%d] of %v on %v is in a sandbox landing zone, which is always protected: remove access: public (07 section 3.3)", [i, name, stamp])
+	msg := sprintf("catalog/domains.yaml: hostnames[%d] of %v on %v is in a sandbox landing zone, which is always protected: remove access: public (07 section 3.3)", [i, name, stamp])
 }
 
 all_fqdns := array.concat([h.fqdn | some [_, _, _, _, h] in hostnames], pages_fqdns)
@@ -404,22 +558,22 @@ all_fqdns := array.concat([h.fqdn | some [_, _, _, _, h] in hostnames], pages_fq
 deny contains msg if {
 	some f in {f | some f in all_fqdns}
 	count([x | some x in all_fqdns; x == f]) > 1
-	msg := sprintf("catalog/tenants.yaml: the hostname %v is used more than once (07 section 2.2)", [f])
+	msg := sprintf("catalog/domains.yaml: the hostname %v is used more than once (07 section 2.2)", [f])
 }
 
 deny contains msg if {
 	some [name, stamp, _, _, h] in hostnames
 	is_string(h.fqdn)
 	not domain_of(h.fqdn)
-	msg := sprintf("catalog/tenants.yaml: the hostname %v of %v on %v is in no domain of domains (07 section 3.2)", [h.fqdn, name, stamp])
+	msg := sprintf("catalog/domains.yaml: the hostname %v of %v on %v is in no domain of domains (07 section 3.2)", [h.fqdn, name, stamp])
 }
 
 deny contains msg if {
 	some [name, stamp, customer, _, h] in hostnames
 	d := domain_of(h.fqdn)
-	owner := {x.owner | some x in domains; x.name == d}
+	owner := {x.tenant | some x in domains; x.name == d}
 	count(owner & {customer, "trislab"}) == 0
-	msg := sprintf("catalog/tenants.yaml: the hostname %v of %v on %v is in %v, which belongs to another customer (07 section 3.2)", [h.fqdn, name, stamp, d])
+	msg := sprintf("catalog/domains.yaml: the hostname %v of %v on %v is in %v, which belongs to another customer (07 section 3.2)", [h.fqdn, name, stamp, d])
 }
 
 # ---- domains[].redirects (07 section 2.1.1) ----
@@ -443,7 +597,7 @@ valid_redirect(r) if {
 deny contains msg if {
 	some [name, i, r] in redirects
 	not valid_redirect(r)
-	msg := sprintf("catalog/tenants.yaml: redirects[%d] of %v must be { from, to } with lowercase FQDNs (07 section 2.1.1)", [i, name])
+	msg := sprintf("catalog/domains.yaml: redirects[%d] of %v must be { from, to } with lowercase FQDNs (07 section 2.1.1)", [i, name])
 }
 
 # Both names are the domain or one label below it.
@@ -452,7 +606,7 @@ deny contains msg if {
 	valid_redirect(r)
 	some h in [r.from, r.to]
 	not redirect_name_in(h, name)
-	msg := sprintf("catalog/tenants.yaml: the redirect name %v is not %v or one label below it (07 section 2.1.1)", [h, name])
+	msg := sprintf("catalog/domains.yaml: the redirect name %v is not %v or one label below it (07 section 2.1.1)", [h, name])
 }
 
 redirect_name_in(h, d) if h == d
@@ -466,7 +620,7 @@ deny contains msg if {
 	some [name, _, r] in redirects
 	valid_redirect(r)
 	r.from == r.to
-	msg := sprintf("catalog/tenants.yaml: the redirect of %v in %v goes to itself (07 section 2.1.1)", [r.from, name])
+	msg := sprintf("catalog/domains.yaml: the redirect of %v in %v goes to itself (07 section 2.1.1)", [r.from, name])
 }
 
 all_redirect_sources := [r.from | some [_, _, r] in redirects; valid_redirect(r)]
@@ -474,13 +628,13 @@ all_redirect_sources := [r.from | some [_, _, r] in redirects; valid_redirect(r)
 deny contains msg if {
 	some f in {f | some f in all_redirect_sources}
 	count([x | some x in all_redirect_sources; x == f]) > 1
-	msg := sprintf("catalog/tenants.yaml: the redirect source %v is used more than once (07 section 2.1.1)", [f])
+	msg := sprintf("catalog/domains.yaml: the redirect source %v is used more than once (07 section 2.1.1)", [f])
 }
 
 deny contains msg if {
 	some f in all_redirect_sources
 	f in all_fqdns
-	msg := sprintf("catalog/tenants.yaml: the redirect source %v is also a hostname of a stamp (07 section 2.1.1)", [f])
+	msg := sprintf("catalog/domains.yaml: the redirect source %v is also a hostname of a stamp (07 section 2.1.1)", [f])
 }
 
 # The Free plan allows 10 Single Redirects rules per zone.
@@ -488,7 +642,7 @@ deny contains msg if {
 	some d in domains
 	is_array(d.redirects)
 	count(d.redirects) > 10
-	msg := sprintf("catalog/tenants.yaml: the domain %v has more than 10 redirects, the Free plan's limit per zone (07 section 2.1.1)", [d.name])
+	msg := sprintf("catalog/domains.yaml: the domain %v has more than 10 redirects, the Free plan's limit per zone (07 section 2.1.1)", [d.name])
 }
 
 # At most one label below its domain, so the universal certificate covers it.
@@ -497,7 +651,7 @@ deny contains msg if {
 	d := domain_of(h.fqdn)
 	h.fqdn != d
 	contains(trim_suffix(h.fqdn, concat("", [".", d])), ".")
-	msg := sprintf("catalog/tenants.yaml: the hostname %v of %v on %v is more than one label below %v (07 section 3)", [h.fqdn, name, stamp, d])
+	msg := sprintf("catalog/domains.yaml: the hostname %v of %v on %v is more than one label below %v (07 section 3)", [h.fqdn, name, stamp, d])
 }
 
 # The longest domain in domains that the hostname is in.
@@ -516,10 +670,10 @@ in_domain(f, d) if endswith(f, concat("", [".", d]))
 # ---- stamp.yaml (07 section 7) ----
 
 deny contains msg if {
-	some t in tenants
+	some t in stamp_tenants
 	is_string(t.stamp)
 	not stamp_yaml[t.stamp]
-	msg := sprintf("catalog/tenants.yaml: the tenant %v is on %v, which has no stamps/%v/stamp.yaml (07 section 7)", [t.name, t.stamp, t.stamp])
+	msg := sprintf("catalog/domains.yaml: the tenant %v is on %v, which has no stamps/%v/stamp.yaml (07 section 7)", [t.name, t.stamp, t.stamp])
 }
 
 deny contains msg if {
@@ -527,7 +681,7 @@ deny contains msg if {
 	s := stamp_yaml[stamp]
 	is_string(h.app)
 	not external_app(s, h.app)
-	msg := sprintf("catalog/tenants.yaml: hostnames[%d] of %v on %v names the app %v, which is not an app of the stamp with ingress: external (07 section 7)", [i, name, stamp, h.app])
+	msg := sprintf("catalog/domains.yaml: hostnames[%d] of %v on %v names the app %v, which is not an app of the stamp with ingress: external (07 section 7)", [i, name, stamp, h.app])
 }
 
 external_app(s, app) if {
@@ -540,7 +694,7 @@ deny contains msg if {
 	some stamp, s in stamp_yaml
 	some a in s.apps
 	not a.repo in {r.name | some r in repos; r.state == "active"}
-	msg := sprintf("stamps/%s/stamp.yaml: the app %v deploys from %v, which is not an active repository in catalog/repos.yaml (07 section 7)", [stamp, a.name, a.repo])
+	msg := sprintf("stamps/%s/stamp.yaml: the app %v deploys from %v, which is not an active repository of a product in the catalog (07 section 7)", [stamp, a.name, a.repo])
 }
 
 # ---- ipam.yaml (07 sections 5 and 6) ----
@@ -727,55 +881,96 @@ range_groups contains [[name, c] | some name, c in lz.stamps; cidr(c)] if {
 
 # ---- Compared with main (07 section 7) ----
 
+# Main's lists, normalised like the PR's (catalog_lib.rego), so a PR is compared
+# the same way whichever shape main and the PR have: old to old, old to new
+# (the PR that moves the catalog to products.yaml and domains.yaml), and new to
+# new. The comparison never skips, and it passes while the PR keeps every
+# owner, repository and code of main.
+
+main_tenants := catalog_lib.tenants_n(main_data)
+
+main_owners := catalog_lib.owners_n(main_data)
+
+main_repos := catalog_lib.repos(main_tenants)
+
+main_stamp_tenants := catalog_lib.stamp_tenants_n(main_data)
+
+# A tenant is retired with state: retired, never deleted.
 deny contains msg if {
-	some m in data.main.owners
+	catalog_lib.is_new(main_data)
+	some m in main_tenants
+	not m.slug in tenant_slugs
+	msg := sprintf("catalog/products.yaml: the tenant %v was removed or renamed; a tenant is retired with state: retired, never deleted (07 section 7)", [m.slug])
+}
+
+# A product is archived with state: archived, never deleted.
+deny contains msg if {
+	catalog_lib.is_new(main_data)
+	some t in main_tenants
+	some p in t.products
+	not [t.slug, p.slug] in {[u.slug, q.slug] | some [u, q] in product_rows}
+	msg := sprintf("catalog/products.yaml: the product %v of %v was removed or renamed; a product is archived with state: archived, never deleted (07 section 11)", [p.slug, t.slug])
+}
+
+deny contains msg if {
+	some m in main_owners
 	not m.slug in {o.slug | some o in owners}
 	not renamed(m)
-	msg := sprintf("catalog/owners.yaml: %v was removed or renamed; an owner is retired with state: retired, never deleted, and its slug changes only while nothing on main references it (07 section 7)", [m.slug])
+	msg := sprintf("catalog/products.yaml: %v was removed or renamed; an owner is retired with state: retired, never deleted, and its slug changes only while nothing on main references it (07 section 7)", [m.slug])
 }
 
 deny contains msg if {
 	some o in owners
-	not o.slug in {m.slug | some m in data.main.owners}
-	some m in data.main.owners
+	not o.slug in {m.slug | some m in main_owners}
+	some m in main_owners
 	m.code == o.code
 	not m.slug in {x.slug | some x in owners}
 	not renamed(m)
-	msg := sprintf("catalog/owners.yaml: %v takes the code %v of %v on main; a code is never reused (07 section 9)", [o.slug, o.code, m.slug])
+	msg := sprintf("catalog/products.yaml: %v takes the code %v of %v on main; a code is never reused (07 section 9)", [o.slug, o.code, m.slug])
 }
 
 # The one exception to "no slug changes": a new slug with main's code, kind and
 # state, while nothing on main references the old one (07 section 7).
 renamed(m) if {
 	some o in owners
-	not o.slug in {x.slug | some x in data.main.owners}
+	not o.slug in {x.slug | some x in main_owners}
 	[o.code, o.kind, o.state] == [m.code, m.kind, m.state]
 	not referenced_on_main(m)
 }
 
 referenced_on_main(m) if {
-	some s in data.main.stamp_yaml
+	some s in object.get(main_data, "stamp_yaml", {})
 	s.product == m.slug
 }
 
 referenced_on_main(m) if {
-	some r in data.main.repos
+	some r in main_repos
 	r.product == m.slug
 }
 
 referenced_on_main(m) if {
-	some r in data.main.repos
+	some r in main_repos
 	r.customer == m.slug
 }
 
 referenced_on_main(m) if {
-	some t in data.main.tenants
+	some r in main_repos
+	r.tenant == m.slug
+}
+
+referenced_on_main(m) if {
+	some t in main_stamp_tenants
 	t.customer == m.slug
 }
 
 referenced_on_main(m) if {
-	some d in data.main.domains
+	some d in object.get(main_data, "domains", [])
 	d.owner == m.slug
+}
+
+referenced_on_main(m) if {
+	some d in object.get(main_data, "domains", [])
+	d.tenant == m.slug
 }
 
 referenced_on_main(m) if {
@@ -785,11 +980,11 @@ referenced_on_main(m) if {
 }
 
 deny contains msg if {
-	some m in data.main.owners
+	some m in main_owners
 	some o in owners
 	o.slug == m.slug
 	o.code != m.code
-	msg := sprintf("catalog/owners.yaml: the code of %v changed from %v to %v; a code never changes (07 section 9)", [m.slug, m.code, o.code])
+	msg := sprintf("catalog/products.yaml: the code of %v changed from %v to %v; a code never changes (07 section 9)", [m.slug, m.code, o.code])
 }
 
 deny contains msg if {
@@ -807,9 +1002,9 @@ deny contains msg if {
 }
 
 deny contains msg if {
-	some m in data.main.repos
+	some m in main_repos
 	not m.name in {r.name | some r in repos}
-	msg := sprintf("catalog/repos.yaml: %v was removed or renamed; a repository is archived with state: archived, never deleted (07 section 11)", [m.name])
+	msg := sprintf("catalog/products.yaml: the repository %v was removed or renamed; a product's repository is archived with state: archived, never deleted (07 section 11)", [m.name])
 }
 
 # ---- landing-zones/<lz>.yaml (05 section 3) ----

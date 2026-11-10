@@ -85,3 +85,19 @@ test_unknown_environment_name_is_denied if {
 	some msg in denied({"tags": object.union(good_tags, {"EnvironmentName": "production"})})
 	contains(msg, `the tag EnvironmentName is "production"`)
 }
+
+# The same owners in the new catalog shape (products.yaml).
+new_catalog := {"tenants": [
+	{"slug": "trislab", "state": "active", "products": [{"slug": "corporate-site", "code": "web", "state": "active"}]},
+	{"slug": "okna-capris", "code": "oc", "state": "active", "products": []},
+]}
+
+test_new_shape_known_owners_pass if {
+	p := plan("azurerm_resource_group", ["create"], {"tags": {"Product": "corporate-site", "Customer": "okna-capris", "EnvironmentType": "prod", "EnvironmentName": "prod"}}, {})
+	count(deny) == 0 with input as p with data.pr as new_catalog
+}
+
+test_new_shape_unknown_customer_is_denied if {
+	p := plan("azurerm_resource_group", ["create"], {"tags": {"Product": "corporate-site", "Customer": "nobody", "EnvironmentType": "prod", "EnvironmentName": "prod"}}, {})
+	count(deny) > 0 with input as p with data.pr as new_catalog
+}

@@ -167,7 +167,7 @@ test_repo_rules if {
 # ---- tenants.yaml ----
 
 test_domain_owner_must_be_customer_or_trislab if {
-	denies(with_list("domains", array.concat(good.domains, [{"name": "x.example", "owner": "construction"}])), "the domain x.example has the owner construction")
+	denies(with_list("domains", array.concat(good.domains, [{"name": "x.example", "owner": "construction"}])), "the domain x.example has the tenant construction")
 }
 
 test_domain_waf_rate_limit_is_a_boolean if {
@@ -339,17 +339,17 @@ test_removed_owner_is_denied if {
 }
 
 # main's owners before step A8 renames website-trislab to corporate-site.
-main_owners := array.concat([object.union(owner_list[0], {"slug": "website-trislab"})], array.slice(owner_list, 1, 4))
+renamed_owners := array.concat([object.union(owner_list[0], {"slug": "website-trislab"})], array.slice(owner_list, 1, 4))
 
 test_renaming_an_unreferenced_owner_passes if {
-	count(compared(good, {"owners": main_owners})) == 0
-	count(compared(good, {"owners": main_owners, "repos": [good.repos[1]], "stamp_yaml": {"x/y": stamp("construction", "z")}})) == 0
+	count(compared(good, {"owners": renamed_owners})) == 0
+	count(compared(good, {"owners": renamed_owners, "repos": [good.repos[1]], "stamp_yaml": {"x/y": stamp("construction", "z")}})) == 0
 }
 
 test_renaming_a_referenced_owner_is_denied if {
-	some msg in compared(good, {"owners": main_owners, "stamp_yaml": {"products-prod-neu/website-trislab": stamp("website-trislab", "website-trislab")}})
+	some msg in compared(good, {"owners": renamed_owners, "stamp_yaml": {"products-prod-neu/website-trislab": stamp("website-trislab", "website-trislab")}})
 	contains(msg, "website-trislab was removed or renamed")
-	some msg2 in compared(good, {"owners": main_owners, "repos": [object.union(good.repos[0], {"name": "website-trislab", "product": "website-trislab"})]})
+	some msg2 in compared(good, {"owners": renamed_owners, "repos": [object.union(good.repos[0], {"name": "website-trislab", "product": "website-trislab"})]})
 	contains(msg2, "website-trislab was removed or renamed")
 }
 
@@ -367,15 +367,15 @@ test_renaming_a_referenced_customer_is_denied if {
 
 test_renamed_owner_with_another_code_is_denied if {
 	pr := with_list("owners", array.concat([object.union(owner_list[0], {"code": "wbs"})], array.slice(owner_list, 1, 4)))
-	some msg in compared(pr, {"owners": main_owners})
+	some msg in compared(pr, {"owners": renamed_owners})
 	contains(msg, "website-trislab was removed or renamed")
 }
 
 test_reused_code_is_denied if {
-	main := array.concat([object.union(main_owners[0], {"state": "retired"})], array.slice(owner_list, 1, 4))
+	main := array.concat([object.union(renamed_owners[0], {"state": "retired"})], array.slice(owner_list, 1, 4))
 	some msg in compared(good, {"owners": main})
 	contains(msg, "corporate-site takes the code web of website-trislab on main")
-	some msg2 in compared(good, {"owners": main_owners, "repos": [object.union(good.repos[0], {"name": "website-trislab", "product": "website-trislab"})]})
+	some msg2 in compared(good, {"owners": renamed_owners, "repos": [object.union(good.repos[0], {"name": "website-trislab", "product": "website-trislab"})]})
 	contains(msg2, "corporate-site takes the code web of website-trislab on main")
 }
 

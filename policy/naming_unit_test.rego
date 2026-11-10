@@ -138,3 +138,19 @@ test_no_owners_matches_no_owner_code if {
 	some msg in deny with input as plan("azurerm_resource_group", {"name": "rg-oc-con-prod"}) with data.pr as {"owners": [], "regions": []}
 	contains(msg, "isn't active in catalog/")
 }
+
+# The same owners in the new catalog shape (products.yaml): tenants with products.
+new_catalog := {"tenants": [
+	{"slug": "trislab", "state": "active", "products": [{"slug": "corporate-site", "code": "web", "state": "active"}, {"slug": "construction", "code": "con", "state": "active"}]},
+	{"slug": "okna-capris", "code": "oc", "state": "active", "products": []},
+	{"slug": "rehabo", "code": "reh", "state": "retired", "products": []},
+], "regions": catalog.regions}
+
+test_new_shape_active_codes_match if {
+	count(deny) == 0 with input as plan("azurerm_resource_group", {"name": "rg-oc-con-prod"}) with data.pr as new_catalog
+}
+
+test_new_shape_retired_customer_code_is_denied if {
+	some msg in deny with input as plan("azurerm_resource_group", {"name": "rg-reh-con-prod"}) with data.pr as new_catalog
+	contains(msg, "isn't active in catalog/")
+}

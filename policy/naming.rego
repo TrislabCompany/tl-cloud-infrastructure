@@ -10,9 +10,14 @@
 # GCP patterns wait for the first GCP customer (ADR 0008).
 package naming
 
-default owners := []
+import data.catalog_lib
 
-owners := data.pr.owners
+default pr_data := {}
+
+pr_data := data.pr
+
+# The owner codes of either catalog shape (catalog_lib.rego).
+owners := catalog_lib.owners_n(pr_data)
 
 default regions := []
 
