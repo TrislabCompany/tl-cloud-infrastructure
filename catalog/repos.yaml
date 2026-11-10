@@ -22,4 +22,4 @@ pages:
     environments:
       - { name: dev, hostname: dev-corporate-site.trislab.com }
       - { name: staging, hostname: staging-corporate-site.trislab.com }
-      - { name: production, hostname: prod-corporate-site.trislab.com }
+      - { name: production, hostname: trislab.com, access: public }

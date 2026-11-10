@@ -73,7 +73,8 @@ resource "github_repository" "this" {
 
   # The template is read only when the repository is created (07 section 11).
   # tl-github-plan can't read the merge settings, so they would always show as
-  # changing; the repository keeps GitHub's defaults (ADR 0038).
+  # changing; the repository keeps GitHub's defaults (ADR 0038) or what its
+  # team sets in its settings, such as deleting merged branches.
   lifecycle {
     ignore_changes = [
       template,
@@ -84,6 +85,7 @@ resource "github_repository" "this" {
       merge_commit_message,
       squash_merge_commit_title,
       squash_merge_commit_message,
+      delete_branch_on_merge,
     ]
   }
 }
