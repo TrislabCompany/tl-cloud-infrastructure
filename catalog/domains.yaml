@@ -9,7 +9,6 @@ domains:
     waf_rate_limit: true             # the rate limit stays without stamps (07 section 2.1)
     redirects:
       - { from: www.trislab.com, to: trislab.com }
-      - { from: prod-corporate-site.trislab.com, to: trislab.com }
   - name: dragonja.si
     tenant: dragonja
   - name: juskoski.si

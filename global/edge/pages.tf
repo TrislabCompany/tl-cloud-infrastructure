@@ -73,15 +73,9 @@ resource "cloudflare_dns_record" "pages" {
 }
 
 # trislab.com moved from the hosting (records/trislab.com) to the production of
-# trislab-website-corporate-site, and prod-corporate-site.trislab.com became a
-# redirect source there. moved updates both records in place, so no apply
-# creates a name while its old record still exists.
+# trislab-website-corporate-site. moved updates the record in place, so no apply
+# creates the name while its old record still exists.
 moved {
   from = cloudflare_dns_record.this["trislab.com/trislab.com/apex"]
   to   = cloudflare_dns_record.pages["trislab.com"]
-}
-
-moved {
-  from = cloudflare_dns_record.pages["prod-corporate-site.trislab.com"]
-  to   = cloudflare_dns_record.this["trislab.com/trislab.com/prod-corporate-site"]
 }

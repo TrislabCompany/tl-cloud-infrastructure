@@ -4,10 +4,9 @@
 
 # The corporate site is the production of the Pages site
 # trislab-website-corporate-site: its apex record comes from pages in
-# catalog/products.yaml (pages.tf). www and prod-corporate-site only carry the
-# redirects to trislab.com in catalog/domains.yaml.
+# catalog/products.yaml (pages.tf). www only carries the redirect to
+# trislab.com in catalog/domains.yaml.
 www: { name: www.trislab.com, type: CNAME, content: trislab.com, proxied: true }
-prod-corporate-site: { name: prod-corporate-site.trislab.com, type: CNAME, content: trislab.com, proxied: true }
 
 # The hosting.
 mail: { name: mail.trislab.com, type: A, content: 212.44.101.122 }
