@@ -79,3 +79,10 @@ moved {
   from = cloudflare_dns_record.this["trislab.com/trislab.com/apex"]
   to   = cloudflare_dns_record.pages["trislab.com"]
 }
+
+# dragonja.si moved from the hosting (records/dragonja.si) to the production of
+# trislab-website-dragonja, in place as trislab.com above.
+moved {
+  from = cloudflare_dns_record.this["dragonja.si/dragonja.si/apex"]
+  to   = cloudflare_dns_record.pages["dragonja.si"]
+}
