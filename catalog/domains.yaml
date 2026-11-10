@@ -11,6 +11,8 @@ domains:
       - { from: www.trislab.com, to: trislab.com }
   - name: dragonja.si
     tenant: trislab
+    redirects:
+      - { from: www.dragonja.si, to: dragonja.si }
   - name: juskoski.si
     tenant: juskoski
   - name: ldistragracisce.si

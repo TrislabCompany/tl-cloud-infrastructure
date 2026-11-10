@@ -56,6 +56,7 @@ tenants:
         environments:
           - { name: dev, hostname: dev.dragonja.si }
           - { name: staging, hostname: staging.dragonja.si }
+          - { name: production, hostname: dragonja.si, access: public }
   - slug: dragonja
     code: dra
     state: retired             # Trislab publishes dragonja.si itself, as its product dragonja
