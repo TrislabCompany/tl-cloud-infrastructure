@@ -1,14 +1,40 @@
-# The app repositories of catalog/repos.yaml, created from their templates
+# The app repositories of catalog/products.yaml, one per product, created from their templates
 # (ADR 0038, 11-onboarding.md section 4.3). Each stamp whose apps[].repo names
 # a repository deploys from it.
 
 locals {
-  org    = "TrislabCompany"
-  owners = yamldecode(file("${path.module}/../../catalog/owners.yaml")).owners
-  repos = {
-    for r in yamldecode(file("${path.module}/../../catalog/repos.yaml")).repos : r.name => r
-    if r.state == "active"
-  }
+  org     = "TrislabCompany"
+  tenants = yamldecode(file("${path.module}/../../catalog/products.yaml")).tenants
+
+  # The owner codes of 07 section 9, as the stamps and the landing-zone module
+  # read them: a product with a code, and a client tenant (every tenant that
+  # has a code; trislab has none).
+  owners = concat(
+    flatten([
+      for t in local.tenants : [
+        for p in t.products : { slug = p.slug, kind = "product", code = p.code, state = p.state == "active" ? "active" : "retired" }
+        if try(p.code, null) != null
+      ]
+    ]),
+    [for t in local.tenants : { slug = t.slug, kind = "customer", code = t.code, state = t.state } if try(t.code, null) != null],
+  )
+
+  # One per active product, by repository name. team is the product's GitHub
+  # team, <tenant>-<product>, so two tenants can each have a corporate-site.
+  repos = merge([
+    for t in local.tenants : {
+      for p in t.products : p.repo => {
+        name         = p.repo
+        tenant       = t.slug
+        product      = p.slug
+        team         = "${t.slug}-${p.slug}"
+        template     = p.template
+        maintainers  = p.maintainers
+        state        = p.state
+        environments = try(p.environments, [])
+      } if p.state == "active"
+    }
+  ]...)
 
   # stamp.yaml by stamp folder, <lz>/<folder>.
   stamp_files = {
@@ -98,13 +124,13 @@ resource "github_repository_file" "codeowners" {
   repository          = github_repository.this[each.key].name
   branch              = "main"
   file                = ".github/CODEOWNERS"
-  commit_message      = "CODEOWNERS for the team ${each.value.product} (ADR 0038)"
+  commit_message      = "CODEOWNERS for the team ${each.value.team} (ADR 0038)"
   overwrite_on_create = true
   content             = <<-EOT
-    * @${local.org}/${each.value.product}
-    /.github/ @${local.org}/${each.value.product} @${local.org}/devops
-    /platform.yaml @${local.org}/${each.value.product} @${local.org}/devops
-    /.trivyignore @${local.org}/${each.value.product} @${local.org}/devops
+    * @${local.org}/${each.value.team}
+    /.github/ @${local.org}/${each.value.team} @${local.org}/devops
+    /platform.yaml @${local.org}/${each.value.team} @${local.org}/devops
+    /.trivyignore @${local.org}/${each.value.team} @${local.org}/devops
   EOT
 
   lifecycle {

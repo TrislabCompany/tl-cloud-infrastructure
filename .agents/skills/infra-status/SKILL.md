@@ -20,7 +20,7 @@ Reads the catalog on `origin/main` and the open PRs, and prints a short report. 
 4. **Stamps:** each `stamps/<lz>/<folder>/stamp.yaml`:
    - the stamp code (`shr`, or the customer code, then the product code and the environment);
    - template and version, environment, range;
-   - its hostnames from `catalog/tenants.yaml`, with derived ones noted.
+   - its hostnames from `stamp_tenants` in `catalog/domains.yaml`, with derived ones noted.
 5. **Free ranges:**
    - `python .agents/skills/_shared/ipam.py hub azure`;
    - `… landing-zone prod`;

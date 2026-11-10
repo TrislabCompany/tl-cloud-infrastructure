@@ -1,0 +1,22 @@
+# Domains and the tenants on each stamp (07 section 2). global/edge creates one
+# Cloudflare zone per domain. `tenant` is a tenant of catalog/products.yaml, the
+# domain's owner. stamp_tenants are the tenants on each stamp (a name on a
+# stamp, not a tenant of products.yaml); one is added by the PR that puts it on
+# a stamp.
+domains:
+  - name: trislab.com
+    tenant: trislab
+    waf_rate_limit: true             # the rate limit stays without stamps (07 section 2.1)
+    redirects:
+      - { from: www.trislab.com, to: trislab.com }
+      - { from: prod-corporate-site.trislab.com, to: trislab.com }
+  - name: dragonja.si
+    tenant: dragonja
+  - name: juskoski.si
+    tenant: juskoski
+  - name: ldistragracisce.si
+    tenant: ldistragracisce
+  - name: spds.si
+    tenant: spds
+
+stamp_tenants: []

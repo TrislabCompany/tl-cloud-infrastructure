@@ -1,6 +1,6 @@
 ---
 name: stamp-destroy
-description: Destroy a stamp in tl-cloud-infrastructure — after its data is exported, delete its folder stamps/<lz>/<folder>, its /27 in catalog/ipam.yaml and its tenant and hostnames in catalog/tenants.yaml — as one PR opened with the user's own gh credentials; the pipeline plans the destroy, and global deletes its DNS records, Access applications and the app repository's Environment. Use when the user asks to destroy, delete, remove, deprovision, tear down or shut down a stamp or an app environment such as dev, staging, demo or prod.
+description: Destroy a stamp in tl-cloud-infrastructure — after its data is exported, delete its folder stamps/<lz>/<folder>, its /27 in catalog/ipam.yaml and its tenant and hostnames in catalog/domains.yaml (stamp_tenants) — as one PR opened with the user's own gh credentials; the pipeline plans the destroy, and global deletes its DNS records, Access applications and the app repository's Environment. Use when the user asks to destroy, delete, remove, deprovision, tear down or shut down a stamp or an app environment such as dev, staging, demo or prod.
 metadata:
   owner: infrastructure
 ---

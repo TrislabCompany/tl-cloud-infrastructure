@@ -2,13 +2,29 @@
 # the members by hand; no member is written here. spn-platform-apply creates
 # them with Group.Create and owns them, which lets it manage them. It reads
 # them back, owners included, with Group.Read.All (ADR 0034).
-# grp-cust-<code>-admins come with the first customer in catalog/owners.yaml.
+# grp-cust-<code>-admins are created for every active client tenant (a tenant
+# with a code) in catalog/products.yaml; Cloudflare Access admits them to the
+# tenant's protected hostnames (global/edge/zero-trust.tf). A retired tenant's
+# group is deleted with it.
 # A prod landing zone's grp-data-<lz>-readers and -admins come in their own PR
 # before the landing zone's, and stay until it is cancelled: policy/catalog.rego
 # denies a plan that deletes one earlier.
 
 locals {
-  groups = {
+  # The client tenants of catalog/products.yaml (trislab has no code).
+  client_tenants = [
+    for t in yamldecode(file("${path.module}/../../../catalog/products.yaml")).tenants : t
+    if try(t.code, null) != null && t.state == "active"
+  ]
+
+  customer_groups = {
+    for t in local.client_tenants : "cust-${t.code}-admins" => {
+      name        = "grp-cust-${t.code}-admins"
+      description = "The administrators of the client ${t.slug}, admitted to its protected hostnames by Cloudflare Access (07-catalog-and-ipam.md section 3.3)."
+    }
+  }
+
+  groups = merge(local.customer_groups, {
     devops = {
       name        = "grp-devops"
       description = "The members of the GitHub team devops (ADR 0031)."
@@ -41,7 +57,7 @@ locals {
       name        = "grp-sandbox-trislab"
       description = "Admitted to Trislab's sandbox hostnames by Cloudflare Access (07-catalog-and-ipam.md section 3.3)."
     }
-  }
+  })
 
   # Reader on mg-root (02-architecture.md section 6), direct while pim is false
   # (ADR 0053).

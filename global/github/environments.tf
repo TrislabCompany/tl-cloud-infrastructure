@@ -58,7 +58,7 @@ resource "github_repository_environment" "this" {
   dynamic "reviewers" {
     for_each = each.value.prod ? [1] : []
     content {
-      teams = [tonumber(data.github_team.devops.id), tonumber(github_team.product[local.repos[each.value.repo].product].id)]
+      teams = [tonumber(data.github_team.devops.id), tonumber(github_team.product[local.repos[each.value.repo].team].id)]
     }
   }
 }

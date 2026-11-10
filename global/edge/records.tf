@@ -1,6 +1,6 @@
 # The DNS records of each zone, one file per domain under records/<zone>/. A
 # record's address is <zone>/<file>/<key>, so a key only has to be unique in
-# its file. The records of stamps come from catalog/tenants.yaml.
+# its file. The records of stamps come from stamp_tenants in catalog/domains.yaml.
 #
 # A name is proxied (proxied: true) when it serves only HTTPS on ports
 # Cloudflare passes and the hosting has a valid certificate for it, which Full
@@ -37,13 +37,23 @@ resource "cloudflare_dns_record" "this" {
 }
 
 # ---- The hostnames of stamps -------------------------------------------------
-# Each hostname in catalog/tenants.yaml, and each derived hostname: the default
+# Each hostname in stamp_tenants of catalog/domains.yaml, and each derived hostname: the default
 # hostname with -<app> added to its first label, for every external app of a
 # stamp.yaml other than the first (07-catalog-and-ipam.md section 3.1).
 # certificates.tf and zero-trust.tf read them too.
 
 locals {
-  owners = yamldecode(file("${path.module}/../../catalog/owners.yaml")).owners
+  # The owner codes of 07 section 9, as the stamps read them: a product with a
+  # code, and a client tenant (every tenant that has a code; trislab has none).
+  owners = concat(
+    flatten([
+      for t in local.tenants : [
+        for p in t.products : { slug = p.slug, kind = "product", code = p.code, state = p.state == "active" ? "active" : "retired" }
+        if try(p.code, null) != null
+      ]
+    ]),
+    [for t in local.tenants : { slug = t.slug, kind = "customer", code = t.code, state = t.state } if try(t.code, null) != null],
+  )
 
   # stamp.yaml by stamp folder, <lz>/<folder>.
   stamp_files = {
@@ -78,7 +88,7 @@ locals {
 
   stamp_hostnames = concat(
     flatten([
-      for t in local.catalog.tenants : [
+      for t in local.catalog.stamp_tenants : [
         for h in try(t.hostnames, []) : { fqdn = h.fqdn, app = h.app, stamp = t.stamp, access = try(h.access, "public") }
       ]
     ]),

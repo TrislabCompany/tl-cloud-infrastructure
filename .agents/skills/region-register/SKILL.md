@@ -36,7 +36,7 @@ Follow [the shared steps](../_shared/pr.md) for the preflight, the checks and th
    - **It already has a hub:** nothing to do. Point to `landing-zone-create`.
 3. **Check the code:**
    - it matches `^[a-z0-9]{2,4}$`;
-   - it is in neither `regions.yaml` (any cloud) nor `owners.yaml`;
+   - it is in neither `regions.yaml` (any cloud) nor an owner code in `products.yaml`;
    - it is not a reserved token (AGENTS.md, "Names").
 4. **Compute the hub range:** `python .agents/skills/_shared/ipam.py hub <cloud>` gives the next free /20 in the cloud's half of the hub pool, for example `10.0.16.0/20`. The `GatewaySubnet` is the /27 at its start, for example `10.0.16.0/27`.
 5. **Service check, region beyond the first six only:** ask the user to confirm that every service the stamp templates use (Container Apps, Key Vault, Log Analytics, the managed identities) is offered in the region. Record the answer in the PR body.

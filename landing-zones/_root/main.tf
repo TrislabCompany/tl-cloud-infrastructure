@@ -2,17 +2,30 @@
 # landing-zones/<lz>.yaml, with the name as TF_VAR_landing_zone and as the
 # state key (08-pipeline.md section 2).
 locals {
-  owners  = yamldecode(file("${path.module}/../../catalog/owners.yaml"))
+  tenants = yamldecode(file("${path.module}/../../catalog/products.yaml")).tenants
   regions = yamldecode(file("${path.module}/../../catalog/regions.yaml"))
   ipam    = yamldecode(file("${path.module}/../../catalog/ipam.yaml"))
+
+  # The owner codes of 07 section 9, as the module reads them: a product with a
+  # code, and a client tenant (every tenant that has a code; trislab has none).
+  owners = concat(
+    flatten([
+      for t in local.tenants : [
+        for p in t.products : { slug = p.slug, kind = "product", code = p.code, state = p.state == "active" ? "active" : "retired" }
+        if try(p.code, null) != null
+      ]
+    ]),
+    [for t in local.tenants : { slug = t.slug, kind = "customer", code = t.code, state = t.state } if try(t.code, null) != null],
+  )
 }
 
 module "landing_zone" {
   source = "git::https://github.com/TrislabCompany/tl-platform.git//landing-zone?ref=landing-zone/v0.7.0"
 
   lz = yamldecode(file("${path.module}/../${var.landing_zone}.yaml"))
+
   catalog = {
-    owners        = local.owners.owners
+    owners        = local.owners
     regions       = local.regions.regions
     landing_zones = try(local.ipam.landing_zones, null)
   }

@@ -8,12 +8,12 @@ This file is the guide for every AI coding tool (Claude Code, Cursor, Codex, …
 
 | Path | What | Layer, Environment |
 | --- | --- | --- |
-| `platform/azure/<root>/` | The platform's own resources: `state`, `governance` (management groups, policy, the allowed regions), `identity` (groups, pipeline identities), `management`, `connectivity` (one `hub-<code>.tf` per region) | `platform`, Environment `platform` |
+| `platform/azure/<root>/` | The platform's own resources: `state`, `governance` (management groups, policy, the allowed regions), `identity` (groups, including `grp-cust-<code>-admins` of every active client tenant, and pipeline identities), `management`, `connectivity` (one `hub-<code>.tf` per region) | `platform`, Environment `platform` |
 | `landing-zones/<lz>.yaml` | One file per landing zone. `landing-zones/_root/` calls the `tl-platform` module `landing-zone` once per file, with the file name as the state key | `landingzones`, Environment `landingzones` |
 | `stamps/<lz>/<folder>/` | One stamp: `stamp.yaml`, a generated `main.tf` and `.terraform.lock.hcl`, nothing else | `stamps`, Environment `lz-<lz>` |
-| `global/edge/` | Cloudflare: zones, the stamps' DNS records, origin certificates, Access applications, redirects, and the Pages projects of the sites in `pages` of `catalog/repos.yaml` with their hostnames, records and Access applications. `global/edge/records/<zone>/*.yaml` holds the records that are not stamps (mail, verification, sites outside the platform) | `global`, Environment `global` |
-| `global/github/` | The app repositories, their Environments and variables, from the catalog; for a Pages site also its Cloudflare deploy token, written as the Environments' secret, and its release tag ruleset | `global`, Environment `global` |
-| `catalog/` | `regions.yaml`, `ipam.yaml`, `owners.yaml`, `repos.yaml`, `tenants.yaml`, `cloudflare-ips.yaml`: the registers every layer reads | Whichever roots read the changed entry |
+| `global/edge/` | Cloudflare: zones, the stamps' DNS records, origin certificates, Access applications, redirects, and the Pages projects of the products with `environments` in `catalog/products.yaml` with their hostnames, records and Access applications. `global/edge/records/<zone>/*.yaml` holds the records that are not stamps (mail, verification, sites outside the platform) | `global`, Environment `global` |
+| `global/github/` | The app repositories (one per product), their GitHub teams `<tenant>-<product>`, Environments and variables, from `catalog/products.yaml`; for a Pages site also its Cloudflare deploy token, written as the Environments' secret, and its release tag ruleset | `global`, Environment `global` |
+| `catalog/` | `regions.yaml`, `ipam.yaml`, `products.yaml` (tenants and their products), `domains.yaml` (domains and `stamp_tenants`), `cloudflare-ips.yaml`: the registers every layer reads | Whichever roots read the changed entry |
 | `policy/` | The rego rules the PR's plan runs (`catalog`, `naming`, `regions`, `tags`, `trusted-code`) and their unit tests | — |
 | `.github/workflows/`, `.github/scripts/` | The pipeline: plan on every PR, `/apply`, drift, stamp check | — |
 | `.agents/skills/` | The skills below; the only place skills are written. `.agents/skills/_shared/` holds the steps and scripts every skill uses | — |
@@ -39,7 +39,7 @@ This file is the guide for every AI coding tool (Claude Code, Cursor, Codex, …
 - **Nothing is applied by hand.** No `tofu apply`, `az … create/delete` or portal changes. `az` is used only to read.
 - **Workflow changes go in their own PR.** A PR that touches `.github/**` together with a root fails.
 - **Generated files are never hand-edited.** A stamp's `main.tf` comes from `tl-platform/stamps/<template>/generate.ps1` at the template's pinned tag.
-- **Registers keep their entries.** No entry is removed from `owners.yaml`, `regions.yaml` or `repos.yaml`: an owner and a region are retired (`state: retired`), a repository is archived. Owner codes, region codes and `-<nn>` numbers are never reused.
+- **Registers keep their entries.** No entry is removed from `products.yaml` or `regions.yaml`: a tenant and a region are retired (`state: retired`), a product and its repository are archived (`state: archived`). Owner codes, region codes and `-<nn>` numbers are never reused.
 - **Ranges.** A range is reserved by being in `catalog/ipam.yaml`, and freed when its entry is deleted. The pools never change without an ADR.
 - **No AI attribution.** No `Co-Authored-By:` trailer and no "generated with" line in a commit, PR title or description.
 - **The repository is public.** No secrets, no personal data (group members are added by hand in Entra ID), no client contracts or prices.

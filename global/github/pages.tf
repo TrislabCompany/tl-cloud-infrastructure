@@ -1,5 +1,5 @@
-# The GitHub side of the sites on Cloudflare Pages (pages in
-# catalog/repos.yaml; global/edge/pages.tf creates the projects): one
+# The GitHub side of the sites on Cloudflare Pages (the products with
+# environments in catalog/products.yaml; global/edge/pages.tf creates the projects): one
 # Environment per environment of a site, with the variables and the secret its
 # deploy workflow reads, and one Cloudflare account token per site that may
 # only deploy to Pages. Cloudflare can't limit a token to one project, so
@@ -7,8 +7,8 @@
 
 locals {
   pages = {
-    for p in try(yamldecode(file("${path.module}/../../catalog/repos.yaml")).pages, []) : p.repo => p
-    if contains(keys(local.repos), p.repo)
+    for repo, r in local.repos : repo => { repo = repo, environments = r.environments }
+    if length(r.environments) > 0
   }
 
   pages_environments = merge([
@@ -47,7 +47,7 @@ resource "github_repository_environment" "pages" {
   dynamic "reviewers" {
     for_each = each.value.production ? [1] : []
     content {
-      teams = [tonumber(data.github_team.devops.id), tonumber(github_team.product[local.repos[each.value.repo].product].id)]
+      teams = [tonumber(data.github_team.devops.id), tonumber(github_team.product[local.repos[each.value.repo].team].id)]
     }
   }
 

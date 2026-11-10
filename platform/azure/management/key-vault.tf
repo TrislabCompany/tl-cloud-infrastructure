@@ -1,7 +1,7 @@
 # The platform Key Vault of 02-architecture.md section 6 (Secrets). The copies
 # of the state passphrases are typed in by hand (ADR 0046), so no secret is
 # written here. The contacts-<code> placeholders come with the first active
-# customer in catalog/owners.yaml (ADR 0050).
+# client tenant in catalog/products.yaml (ADR 0050).
 
 data "azurerm_client_config" "current" {}
 
