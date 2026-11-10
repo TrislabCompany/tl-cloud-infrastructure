@@ -10,7 +10,7 @@ domains:
     redirects:
       - { from: www.trislab.com, to: trislab.com }
   - name: dragonja.si
-    tenant: dragonja
+    tenant: trislab
   - name: juskoski.si
     tenant: juskoski
   - name: ldistragracisce.si
