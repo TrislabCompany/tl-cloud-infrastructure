@@ -72,7 +72,9 @@ today_new := object.union({"regions": regions}, object.union(ipam, {
 	"stamp_tenants": [],
 }))
 
-check(pr, main) := data.catalog.deny with input as {} with data.pr as pr with data.main as main
+check(pr, main) := d if {
+	d := data.catalog.deny with input as {} with data.pr as pr with data.main as main
+}
 
 test_todays_old_catalog_is_not_denied if {
 	count(check(today_old, {})) == 0
