@@ -7,3 +7,13 @@ variable "cloudflare_account_id" {
     error_message = "cloudflare_account_id must be 32 hexadecimal characters. Is the repository variable CLOUDFLARE_ACCOUNT_ID set?"
   }
 }
+
+variable "alert_email_platform" {
+  description = "The platform team's role mailbox, from the repository variable ALERT_EMAIL_PLATFORM, which every root gets (08-pipeline.md section 2). Cloudflare's notifications go to it (notifications.tf)."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[^@ ]+@[^@ ]+$", var.alert_email_platform))
+    error_message = "alert_email_platform must be an e-mail address. Is the repository variable ALERT_EMAIL_PLATFORM set?"
+  }
+}
