@@ -16,6 +16,20 @@ resource "cloudflare_zone" "this" {
   account  = { id = var.cloudflare_account_id }
   name     = each.key
   type     = "full"
+
+  # A domain with search_console keeps the TXT record that verifies its Google
+  # Search Console property (07 section 2.1.2): the key it names is a
+  # google-site-verification record in records/<domain>/<domain>.yaml, so a
+  # change to the records can't drop it unnoticed.
+  lifecycle {
+    precondition {
+      condition = try(each.value.search_console, null) == null || can(regex(
+        "^google-site-verification=",
+        local.records["${each.key}/${each.key}/${each.value.search_console.verification}"].type == "TXT" ? local.records["${each.key}/${each.key}/${each.value.search_console.verification}"].content : ""
+      ))
+      error_message = "catalog/domains.yaml: the search_console verification of ${each.key} is not a google-site-verification TXT record in global/edge/records/${each.key}/${each.key}.yaml (07 section 2.1.2)."
+    }
+  }
 }
 
 resource "cloudflare_zone_setting" "ssl" {
