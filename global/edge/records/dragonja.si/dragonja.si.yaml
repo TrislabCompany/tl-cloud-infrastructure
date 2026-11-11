@@ -23,7 +23,8 @@ mx: { name: dragonja.si, type: MX, priority: 0, content: mail.dragonja.si }
 mail: { name: mail.dragonja.si, type: A, content: 212.44.101.122 }
 webmail: { name: webmail.dragonja.si, type: A, content: 212.44.101.122 }
 spf: { name: dragonja.si, type: TXT, content: "v=spf1 +a +mx +ip4:212.44.101.122 +include:_spf.controlpanel.si ~all" }
-dmarc: { name: _dmarc.dragonja.si, type: TXT, content: "v=DMARC1; p=none" }
+# DMARC reports go to Cloudflare DMARC Management (Email > DMARC Management).
+dmarc: { name: _dmarc.dragonja.si, type: TXT, content: "v=DMARC1; p=none; rua=mailto:a2ac94914b0543e3bd9012e83824c40f@dmarc-reports.cloudflare.net;" }
 dkim-default: { name: default._domainkey.dragonja.si, type: TXT, content: "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwmFY83cdBw7QjRkOuYmq/5U8FrYvtxa3rFiPXu4v8VwEk0mQV066hqW4KY32fD0y+sj/4TbcRfkQZeI5F/W69oOMd/D/qD4PiUFDFiIQ1I8fHLlKf14TqH46I3I9bDKvaGWXRkJuAtgX0riqsgbzd2f4vif5GgD6Jb6ZZiZWjQAS4AoviSAsjyDbKdw3CWMbZZcgGUUVLfwbY5wb0pMl5ySnmT0N5ltfaF/nqcGcel1QK5zgYzNOxPUjNrdkB8UR14N7arvALmN34HJ+hhAB3LKN8WRX/2UG51u8VFpeXzci3AzkzqxZ0qbfwLPXcBByolAs49cYXaCW+aNuyAZp2QIDAQAB;" }
 
 # Mail client set-up and groupware (cPanel).
