@@ -32,6 +32,9 @@
 #               Deleting an environment deletes its hostname, record, Access
 #               application and GitHub Environment; deleting the product's
 #               environments also deletes the project and its token.
+#               web_analytics: true (production only) creates a Cloudflare Web
+#               Analytics site, turnstile: true a Turnstile widget for a form
+#               (ADR 0060); both are off unless set.
 tenants:
   - slug: trislab
     state: active
