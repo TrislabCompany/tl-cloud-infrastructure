@@ -94,6 +94,7 @@ schemas := {
 	}},
 	"domains": {"file": "domains.yaml", "section": 2, "required": {"name", "tenant"}, "fields": {
 		"name": fqdn, "tenant": slug, "redirects": "array", "waf_rate_limit": "boolean", "search_console": "object",
+		"dnssec": "boolean", "bots": "object",
 	}},
 	"stamp_tenants": {"file": "domains.yaml", "section": 2, "required": {"name", "customer", "stamp"}, "fields": {
 		"name": `^[a-z0-9-]{1,40}$`, "customer": slug, "stamp": `^[a-z0-9-]+/[a-z0-9-]+$`, "hostnames": "array",
@@ -385,11 +386,14 @@ pages_environments contains [p.repo, i, e] if {
 
 valid_pages_environment(e) if {
 	is_object(e)
-	object.keys(e) - {"access"} == {"name", "hostname"}
+	object.keys(e) - {"access", "web_analytics", "turnstile"} == {"name", "hostname"}
 	e.name in {"dev", "staging", "production"}
 	is_string(e.hostname)
 	regex.match(fqdn, e.hostname)
 	valid_access(e)
+	every k in {"web_analytics", "turnstile"} {
+		is_boolean(object.get(e, k, false))
+	}
 }
 
 pages_fqdns := [e.hostname | some [_, _, e] in pages_environments; valid_pages_environment(e)]
@@ -397,7 +401,17 @@ pages_fqdns := [e.hostname | some [_, _, e] in pages_environments; valid_pages_e
 deny contains msg if {
 	some [repo, i, e] in pages_environments
 	not valid_pages_environment(e)
-	msg := sprintf("catalog/products.yaml: environments[%d] of the site %v must be { name, hostname } with the name dev, staging or production and a lowercase FQDN, and an optional access: public or protected (07 section 11)", [i, repo])
+	msg := sprintf("catalog/products.yaml: environments[%d] of the site %v must be { name, hostname } with the name dev, staging or production and a lowercase FQDN, and an optional access: public or protected, web_analytics and turnstile (true or false) (07 section 11)", [i, repo])
+}
+
+# Cloudflare Web Analytics counts real visitors, so only production has it:
+# dev and staging are behind Cloudflare Access (ADR 0060).
+deny contains msg if {
+	some [repo, i, e] in pages_environments
+	is_object(e)
+	e.web_analytics == true
+	e.name != "production"
+	msg := sprintf("catalog/products.yaml: environments[%d] of the site %v is %v: only production can have web_analytics: true (ADR 0060)", [i, repo, e.name])
 }
 
 # Only production can be public. dev and staging are always behind Cloudflare Access.
@@ -664,6 +678,43 @@ deny contains msg if {
 	is_object(d.search_console)
 	not valid_search_console(d)
 	msg := sprintf("catalog/domains.yaml: search_console of %v must be { property: sc-domain:%v, owner: trislab, verification: <key of its TXT record> } (07 section 2.1.2)", [d.name, d.name])
+}
+
+# ---- domains[].dnssec and domains[].bots (ADR 0060) ----
+
+# bots names the zone's free bot settings: fight_mode is Bot Fight Mode,
+# block_ai blocks AI crawlers. At least one, each true or false.
+valid_bots(d) if {
+	b := d.bots
+	count(object.keys(b)) > 0
+	object.keys(b) - {"fight_mode", "block_ai"} == set()
+	every v in object.keys(b) {
+		is_boolean(b[v])
+	}
+}
+
+deny contains msg if {
+	some d in domains
+	is_object(d.bots)
+	not valid_bots(d)
+	msg := sprintf("catalog/domains.yaml: bots of %v must be { fight_mode, block_ai } with true or false (ADR 0060)", [d.name])
+}
+
+# The zones that serve a stamp hostname.
+stamp_zones contains z if {
+	some [_, _, _, _, h] in hostnames
+	is_string(h.fqdn)
+	z := domain_of(h.fqdn)
+}
+
+# On the Free plan no rule can skip Bot Fight Mode, so it would also challenge
+# the API clients and webhooks of a stamp's apps.
+deny contains msg if {
+	some d in domains
+	is_object(d.bots)
+	d.bots.fight_mode == true
+	d.name in stamp_zones
+	msg := sprintf("catalog/domains.yaml: %v serves stamp hostnames, so bots.fight_mode can't be true: on the Free plan nothing can skip it for API clients (ADR 0060)", [d.name])
 }
 
 # At most one label below its domain, so the universal certificate covers it.

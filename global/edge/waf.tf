@@ -2,10 +2,12 @@
 # (10-roadmap.md section 13, phase 10 edge rules; ADR 0027). Cloudflare's free
 # managed ruleset runs on every proxied name of every zone by default and isn't
 # managed here. A zone that serves no stamp hostname gets no custom rule: its
-# proxied names are sites on outside hosting, which may serve PHP. It gets the
-# rate limit only when its domain sets waf_rate_limit: true in
-# catalog/domains.yaml, so the outside sites of a zone such as trislab.com keep
-# it while the zone has no stamp (07 section 2.1).
+# proxied names are sites on outside hosting, which may serve PHP. The rate
+# limit covers every zone that serves a stamp or the public production of a
+# site on Cloudflare Pages (ADR 0060), and a zone whose domain sets
+# waf_rate_limit: true in catalog/domains.yaml, so the outside sites of a zone
+# keep it while it has neither (07 section 2.1). waf_rate_limit: false turns it
+# off for a zone.
 #
 # The Free plan allows 5 custom rules and 1 rate limiting rule per zone. Each
 # phase has one entry-point ruleset per zone, so a rule added by hand in the
@@ -18,11 +20,16 @@ locals {
     z => sort([for fqdn, h in local.hostnames : fqdn if h.zone == z])
   }
 
-  # The zones that serve stamps, and those whose domain opts in.
-  rate_limit_zones = toset(concat(
-    keys(local.waf_zones),
-    [for d in local.catalog.domains : d.name if try(d.waf_rate_limit, false)],
-  ))
+  # The zones that serve stamps or a public Pages production, and those whose
+  # domain opts in, less those whose domain opts out.
+  rate_limit_zones = setsubtract(
+    toset(concat(
+      keys(local.waf_zones),
+      [for h in values(local.pages_hostnames) : h.zone if h.environment == "production" && !h.protected && h.zone != null],
+      [for d in local.catalog.domains : d.name if try(d.waf_rate_limit, false)],
+    )),
+    [for d in local.catalog.domains : d.name if try(d.waf_rate_limit, null) == false],
+  )
 }
 
 # Requests for paths no platform app serves: PHP, WordPress and leaked

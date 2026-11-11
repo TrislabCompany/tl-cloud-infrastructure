@@ -666,6 +666,33 @@ test_search_console_needs_every_field if {
 	denies(with_list("domains", array.concat(sc, array.slice(good.domains, 1, count(good.domains)))), "search_console of trislab.com must be")
 }
 
+with_domain(i, extra) := with_list("domains", [patched(i, j, x, extra) | some j, x in good.domains])
+
+patched(i, j, x, extra) := object.union(x, extra) if i == j
+
+patched(i, j, x, _) := x if i != j
+
+test_dnssec_and_bots_are_allowed if {
+	count(denied(with_domain(3, {"dnssec": true, "bots": {"fight_mode": true, "block_ai": true}}))) == 0
+	count(denied(with_domain(0, {"dnssec": false, "bots": {"block_ai": true}}))) == 0
+	count(denied(with_domain(0, {"waf_rate_limit": false}))) == 0
+}
+
+test_dnssec_must_be_boolean if {
+	denies(with_domain(3, {"dnssec": "yes"}), "dnssec")
+}
+
+test_bots_shape if {
+	denies(with_domain(3, {"bots": {}}), "bots of okna-capris.example must be")
+	denies(with_domain(3, {"bots": {"fight_mode": "on"}}), "bots of okna-capris.example must be")
+	denies(with_domain(3, {"bots": {"super_bot_fight": true}}), "bots of okna-capris.example must be")
+}
+
+test_bot_fight_mode_is_denied_on_a_stamp_zone if {
+	denies(with_domain(0, {"bots": {"fight_mode": true}}), "trislab.com serves stamp hostnames, so bots.fight_mode can't be true")
+	count(denied(with_domain(0, {"bots": {"fight_mode": false, "block_ai": true}}))) == 0
+}
+
 test_redirect_in_the_domain_is_allowed if {
 	count(denied(good)) == 0
 }
@@ -783,6 +810,17 @@ test_only_production_can_be_public if {
 	count(denied(with_site_environments([{"name": "production", "hostname": "prod-hunting.trislab.com", "access": "protected"}]))) == 0
 	count(denied(with_site_environments([{"name": "production", "hostname": "prod-hunting.trislab.com"}]))) == 0
 	count(denied(with_site_environments([{"name": "dev", "hostname": "dev-hunting.trislab.com", "access": "protected"}]))) == 0
+}
+
+test_web_analytics_and_turnstile_flags if {
+	count(denied(with_site_environments([{"name": "production", "hostname": "prod-hunting.trislab.com", "access": "public", "web_analytics": true, "turnstile": true}]))) == 0
+	count(denied(with_site_environments([{"name": "dev", "hostname": "dev-hunting.trislab.com", "turnstile": true}]))) == 0
+	denies(with_site_environments([{"name": "production", "hostname": "prod-hunting.trislab.com", "turnstile": "yes"}]), "environments[0] of the site trislab-website-hunting must be")
+}
+
+test_web_analytics_only_on_production if {
+	denies(with_site_environments([{"name": "staging", "hostname": "staging-hunting.trislab.com", "web_analytics": true}]), "is staging: only production can have web_analytics: true")
+	count(denied(with_site_environments([{"name": "staging", "hostname": "staging-hunting.trislab.com", "web_analytics": false}]))) == 0
 }
 
 test_dev_can_never_be_public if {
