@@ -12,6 +12,12 @@ resource "cloudflare_zone_dnssec" "this" {
   for_each = { for name, d in local.domains : name => d if try(d.dnssec, false) }
   zone_id  = cloudflare_zone.this[each.key].id
   status   = "active"
+
+  # Cloudflare reports "pending" until the DS record is at the registrar; asking
+  # for "active" again would show as a change on every plan and drift check.
+  lifecycle {
+    ignore_changes = [status]
+  }
 }
 
 # What the registrar asks for: the DS record, or its parts (key tag, algorithm
