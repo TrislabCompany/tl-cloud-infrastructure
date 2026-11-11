@@ -644,6 +644,28 @@ test_cancelled_stays_cancelled if {
 	contains(msg, "it was cancelled on main and stays cancelled")
 }
 
+test_search_console_domain_property_is_allowed if {
+	sc := [object.union(good.domains[0], {"search_console": {"property": "sc-domain:trislab.com", "owner": "trislab", "verification": "google"}})]
+	count(denied(with_list("domains", array.concat(sc, array.slice(good.domains, 1, count(good.domains)))))) == 0
+}
+
+test_search_console_of_another_domain_is_denied if {
+	sc := [object.union(good.domains[0], {"search_console": {"property": "sc-domain:construction.com", "owner": "trislab", "verification": "google"}})]
+	denies(with_list("domains", array.concat(sc, array.slice(good.domains, 1, count(good.domains)))), "search_console of trislab.com must be")
+}
+
+test_search_console_url_prefix_or_other_owner_is_denied if {
+	prefix := [object.union(good.domains[0], {"search_console": {"property": "https://trislab.com/", "owner": "trislab", "verification": "google"}})]
+	denies(with_list("domains", array.concat(prefix, array.slice(good.domains, 1, count(good.domains)))), "search_console of trislab.com must be")
+	other := [object.union(good.domains[0], {"search_console": {"property": "sc-domain:trislab.com", "owner": "someone", "verification": "google"}})]
+	denies(with_list("domains", array.concat(other, array.slice(good.domains, 1, count(good.domains)))), "search_console of trislab.com must be")
+}
+
+test_search_console_needs_every_field if {
+	sc := [object.union(good.domains[0], {"search_console": {"property": "sc-domain:trislab.com", "owner": "trislab"}})]
+	denies(with_list("domains", array.concat(sc, array.slice(good.domains, 1, count(good.domains)))), "search_console of trislab.com must be")
+}
+
 test_redirect_in_the_domain_is_allowed if {
 	count(denied(good)) == 0
 }
