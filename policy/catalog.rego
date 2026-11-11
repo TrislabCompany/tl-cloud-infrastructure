@@ -93,7 +93,7 @@ schemas := {
 		"name": slug, "cloud": `^(azure|gcp)$`, "code": `^[a-z0-9]{2,4}$`, "state": `^(active|retired)$`,
 	}},
 	"domains": {"file": "domains.yaml", "section": 2, "required": {"name", "tenant"}, "fields": {
-		"name": fqdn, "tenant": slug, "redirects": "array", "waf_rate_limit": "boolean",
+		"name": fqdn, "tenant": slug, "redirects": "array", "waf_rate_limit": "boolean", "search_console": "object",
 	}},
 	"stamp_tenants": {"file": "domains.yaml", "section": 2, "required": {"name", "customer", "stamp"}, "fields": {
 		"name": `^[a-z0-9-]{1,40}$`, "customer": slug, "stamp": `^[a-z0-9-]+/[a-z0-9-]+$`, "hostnames": "array",
@@ -643,6 +643,27 @@ deny contains msg if {
 	is_array(d.redirects)
 	count(d.redirects) > 10
 	msg := sprintf("catalog/domains.yaml: the domain %v has more than 10 redirects, the Free plan's limit per zone (07 section 2.1.1)", [d.name])
+}
+
+# ---- domains[].search_console (07 section 2.1.2) ----
+
+# The domain's Google Search Console property: always a domain property of the
+# domain itself, owned by Trislab, and verified by a TXT record of the domain's
+# records file, named by its key.
+valid_search_console(d) if {
+	sc := d.search_console
+	object.keys(sc) == {"property", "owner", "verification"}
+	sc.property == concat("", ["sc-domain:", d.name])
+	sc.owner == "trislab"
+	is_string(sc.verification)
+	regex.match(slug, sc.verification)
+}
+
+deny contains msg if {
+	some d in domains
+	is_object(d.search_console)
+	not valid_search_console(d)
+	msg := sprintf("catalog/domains.yaml: search_console of %v must be { property: sc-domain:%v, owner: trislab, verification: <key of its TXT record> } (07 section 2.1.2)", [d.name, d.name])
 }
 
 # At most one label below its domain, so the universal certificate covers it.
