@@ -2,17 +2,21 @@
 # Cloudflare zone per domain. `tenant` is a tenant of catalog/products.yaml, the
 # domain's owner. stamp_tenants are the tenants on each stamp (a name on a
 # stamp, not a tenant of products.yaml); one is added by the PR that puts it on
-# a stamp.
+# a stamp. search_console is the domain's Google Search Console property,
+# owned by Trislab and verified by the TXT record with that key in
+# global/edge/records/<domain>/ (07 section 2.1.2); global/edge checks the record.
 domains:
   - name: trislab.com
     tenant: trislab
     waf_rate_limit: true             # the rate limit stays without stamps (07 section 2.1)
     redirects:
       - { from: www.trislab.com, to: trislab.com }
+    search_console: { property: sc-domain:trislab.com, owner: trislab, verification: google }
   - name: dragonja.si
     tenant: trislab
     redirects:
       - { from: www.dragonja.si, to: dragonja.si }
+    search_console: { property: sc-domain:dragonja.si, owner: trislab, verification: google }
   - name: juskoski.si
     tenant: juskoski
   - name: ldistragracisce.si
