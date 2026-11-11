@@ -55,6 +55,40 @@ resource "cloudflare_zone_setting" "min_tls_version" {
   value      = "1.2"
 }
 
+# Free speed settings of every zone (ADR 0060): HTTP/3 and 0-RTT for faster
+# connections, Early Hints so browsers fetch a page's files sooner. Each is one
+# entry of the map; a new one is one line.
+locals {
+  speed_settings = { http3 = "on", early_hints = "on", "0rtt" = "on" }
+}
+
+resource "cloudflare_zone_setting" "speed" {
+  for_each = {
+    for pair in setproduct(keys(local.domains), keys(local.speed_settings)) :
+    "${pair[0]}/${pair[1]}" => { zone = pair[0], setting = pair[1] }
+  }
+  zone_id    = cloudflare_zone.this[each.value.zone].id
+  setting_id = each.value.setting
+  value      = local.speed_settings[each.value.setting]
+}
+
+# Tiered Cache with the Smart topology, free on every plan: a cache miss asks
+# one upper-tier Cloudflare data centre before the origin, so a Pages site or
+# a stamp is asked less often.
+resource "cloudflare_argo_tiered_caching" "this" {
+  for_each = cloudflare_zone.this
+  zone_id  = each.value.id
+  value    = "on"
+}
+
+resource "cloudflare_tiered_cache" "this" {
+  for_each = cloudflare_zone.this
+  zone_id  = each.value.id
+  value    = "on"
+
+  depends_on = [cloudflare_argo_tiered_caching.this]
+}
+
 # A new zone's nameservers are known only after apply, so they are read from
 # the apply log or the Cloudflare dashboard, not from the plan.
 output "name_servers" {
