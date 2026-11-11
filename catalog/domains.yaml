@@ -5,6 +5,11 @@
 # a stamp. search_console is the domain's Google Search Console property,
 # owned by Trislab and verified by the TXT record with that key in
 # global/edge/records/<domain>/ (07 section 2.1.2); global/edge checks the record.
+# dnssec: true signs the zone; its DS record (output ds_records) is then
+# entered at the registrar by hand, and removed there first before dnssec goes
+# back to false or the domain leaves Cloudflare (ADR 0060). bots sets the free
+# bot settings: fight_mode is Bot Fight Mode, never on a zone with stamps;
+# block_ai blocks AI crawlers at the edge (ADR 0060).
 domains:
   - name: trislab.com
     tenant: trislab
@@ -12,11 +17,15 @@ domains:
     redirects:
       - { from: www.trislab.com, to: trislab.com }
     search_console: { property: sc-domain:trislab.com, owner: trislab, verification: google }
+    dnssec: true
+    bots: { fight_mode: false, block_ai: true }   # cpanel and a client site on the hosting share the zone
   - name: dragonja.si
     tenant: trislab
     redirects:
       - { from: www.dragonja.si, to: dragonja.si }
     search_console: { property: sc-domain:dragonja.si, owner: trislab, verification: google }
+    dnssec: true
+    bots: { fight_mode: true, block_ai: true }
   - name: juskoski.si
     tenant: juskoski
   - name: ldistragracisce.si
