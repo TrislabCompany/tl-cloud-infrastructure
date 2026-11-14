@@ -5,7 +5,7 @@ paths:
 
 # GitHub Actions workflows and scripts
 
-Checked by: `actionlint` (`pull-request-plan.yml`, when `.github/` changes). The pin rule is review only. A workflow change goes in its own PR: a PR that touches `.github/**` together with a root fails (AGENTS.md).
+Checked by: `actionlint` and `.github/scripts/check-pins.py` (`pull-request-plan.yml`, when `.github/` changes). A workflow change goes in its own PR: a PR that touches `.github/**` together with a root fails (AGENTS.md).
 
 ## Workflows
 

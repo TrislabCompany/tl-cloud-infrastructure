@@ -5,7 +5,7 @@ paths:
 
 # Python scripts
 
-Checked by: review only today. The scripts are the skills' helpers in `.agents/skills/_shared/` (`check-catalog.py`, `check-skills.py`, `ipam.py`); they run on a developer's machine and in the pipeline.
+Checked by: `ruff check` and `ruff format --check` (settings in `ruff.toml`, the plan's `lint python` job); the rest is review. The scripts are the skills' helpers in `.agents/skills/_shared/` (`check-catalog.py`, `check-skills.py`, `ipam.py`); they run on a developer's machine and in the pipeline.
 
 - **A script starts with `#!/usr/bin/env python3` and a docstring** that says what it does, whether it only reads, how to run it (every form of its arguments) and what it needs ("Needs PyYAML", "needs conftest").
 - **Arguments with `argparse`,** subcommands for distinct jobs (`ipam.py hub|landing-zone|stamp`). Run from the repository root; paths relative to it.
