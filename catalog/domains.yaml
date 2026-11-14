@@ -30,6 +30,10 @@ domains:
     tenant: juskoski
   - name: ldistragracisce.si
     tenant: ldistragracisce
+    redirects:
+      - { from: www.ldistragracisce.si, to: ldistragracisce.si }
+    dnssec: true
+    bots: { fight_mode: false, block_ai: true }   # the site stays on the hosting until the cutover
   - name: spds.si
     tenant: spds
 
