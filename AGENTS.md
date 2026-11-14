@@ -17,6 +17,7 @@ This file is the guide for every AI coding tool (Claude Code, Cursor, Codex, …
 | `policy/` | The rego rules the PR's plan runs (`catalog`, `naming`, `regions`, `tags`, `trusted-code`) and their unit tests | — |
 | `.github/workflows/`, `.github/scripts/` | The pipeline: plan on every PR, `/apply`, drift, stamp check | — |
 | `.agents/skills/` | The skills below; the only place skills are written. `.agents/skills/_shared/` holds the steps and scripts every skill uses | — |
+| `.claude/rules/` | The coding rules, loaded by path (below) | — |
 | `.claude/skills/` | One pointer per skill, with the same front matter, so that Claude Code lists it | — |
 
 ## How a change is applied
@@ -32,6 +33,24 @@ This file is the guide for every AI coding tool (Claude Code, Cursor, Codex, …
 - **One step per PR when an order is needed.** A landing zone comes in one PR and its stamps in a second, because a stamp needs the Environment `lz-<lz>` that the landing zone's apply creates. A PR that depends on another says `Depends on #<n>` in its description, and is re-planned automatically when that one is applied.
 - **Rebase before `/apply`** when `main` has changed the PR's roots since its plan. After a rebase, `git diff --stat origin/main...HEAD` lists only the PR's own files; rebuild the branch rather than keep a commit that takes out what another PR now owns ([`_shared/pr.md`](.agents/skills/_shared/pr.md#update-a-pr)).
 - **Removing a root** (a stamp folder, a landing zone file) is planned with `-destroy` from `main`'s copy.
+
+## Coding rules
+
+The rules for writing code are in `.claude/rules/`. Each has `paths:` front matter, so Claude Code loads it when you touch a matching file; other tools: read the rule before working in that area. Each rule says which check enforces it; the prose is what review has to catch.
+
+| Working on… | Read |
+| --- | --- |
+| A root, a landing zone file or a stamp: what is hand-written, data-driven `for_each`, layers, tags, pins | `coding-hcl.md` |
+| `catalog/`, `landing-zones/*.yaml`, `stamp.yaml`, edge records: the schema in the header, change only by adding | `catalog.md` |
+| `policy/`: one package per concern, unit tests, deny messages | `policy.md` |
+| The Python helpers in `.agents/skills/_shared/` | `coding-python.md` |
+| `.github/`: workflows, pins, permissions, logging in a run, scripts | `workflows.md` |
+
+## Git and review
+
+- Branch from `main` with a short kebab-case topic. One step per PR when an order is needed; a workflow change in its own PR.
+- The PR title is a plain sentence with the lifecycle verb (`Create the landing zone products-prod-neu`), 72 characters or fewer; the body follows `_shared/pr.md`. The workflow merges it after `/apply`.
+- A review checks: the plan (no unexpected destroy or replace), the catalog rules, tags, pins, a unit test for each new rego rule, no secrets or personal data. Nobody approves their own.
 
 ## Rules
 
