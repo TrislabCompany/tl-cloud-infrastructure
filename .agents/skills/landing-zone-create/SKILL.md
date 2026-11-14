@@ -1,6 +1,6 @@
 ---
 name: landing-zone-create
-description: Create an application landing zone in tl-cloud-infrastructure — choose its scope (products, cust-<code>, prdt-<code>), environment type (prod or sandbox) or experiment, region with a hub, archetype, budget and access; reserve its /20 in catalog/ipam.yaml; write landing-zones/<lz>.yaml; add the prod data access groups — as one PR opened with the user's own gh credentials. Use when the user asks to create, add, provision, set up or build a landing zone, a subscription for products or a customer, a prod or sandbox environment class, or an experiment subscription.
+description: Create an application landing zone — prod, sandbox or experiment — in a region with a hub — its scope, archetype, budget, access and /20 range, as one PR. Use when the user asks to create, add, provision, set up or build a landing zone, a subscription for products or a customer, a prod or sandbox environment class, or an experiment subscription.
 metadata:
   owner: infrastructure
 ---
