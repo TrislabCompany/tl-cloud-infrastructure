@@ -1,6 +1,7 @@
 ---
 name: region-retire
 description: Retire a cloud region once nothing uses it — delete its hub (platform/azure/connectivity/hub-<code>.tf and its range in catalog/ipam.yaml), then set state retired in catalog/regions.yaml, never deleting the entry — as two dependent PRs in tl-cloud-infrastructure, opened with the user's own gh credentials. Use when the user asks to retire, remove, delete, deprovision, decommission or tear down a region or a hub.
+disable-model-invocation: true
 metadata:
   owner: infrastructure
 ---

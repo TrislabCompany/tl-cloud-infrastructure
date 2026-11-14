@@ -43,6 +43,10 @@ This file is the guide for every AI coding tool (Claude Code, Cursor, Codex, …
 - **Ranges.** A range is reserved by being in `catalog/ipam.yaml`, and freed when its entry is deleted. The pools never change without an ADR.
 - **No AI attribution.** No `Co-Authored-By:` trailer and no "generated with" line in a commit, PR title or description.
 - **The repository is public.** No secrets, no personal data (group members are added by hand in Entra ID), no client contracts or prices.
+- **Commit with your Trislab account** (the trislab.com address), never a personal one or another employer's. Check `git config user.email` in a new clone.
+- **Decisions during planning.** While spec v2 is being planned, an accepted ADR is edited in place, with its date updated; never write a superseding ADR. A changed decision still needs the owner's yes.
+- **Startup phase.** Build only what the pilots need: pick the simplest option that still tests the real process, and list the bigger ones with their cost and the trigger that brings them back (ADR 0054).
+- **Writing.** Write "section N", never "§". Name a change set in full (`CS-04-kit-hardening-and-tenant-isolation`), never the bare `CS-04`, in files, commits and PRs.
 
 ## Lifecycle verbs
 
@@ -93,13 +97,16 @@ Run the ones that are installed. The PR's plan runs all of them anyway.
 ```bash
 tofu fmt -check -recursive
 python .agents/skills/_shared/check-catalog.py       # the catalog rules, as the plan runs them (needs conftest)
+python .agents/skills/_shared/check-skills.py        # every skill has its .claude/skills pointer, with the same front matter
 conftest verify --policy policy                       # when policy/ changed (needs conftest)
 tofu -chdir=<root> init -backend=false && tofu -chdir=<root> validate   # each changed .tf root
 ```
 
 ## Skills
 
-Skills live only in `.agents/skills/<name>/SKILL.md`. When a task matches a skill, read that file and follow it. Claude Code finds skills only in `.claude/skills/`, so each skill also has a pointer `.claude/skills/<name>/SKILL.md`, with the same front matter and a body that sends the agent to the real file. Add one with every new skill. Every skill follows [the shared steps](.agents/skills/_shared/pr.md) and ends with an open PR.
+Skills live only in `.agents/skills/<name>/SKILL.md`. When a task matches a skill, read that file and follow it. Claude Code finds skills only in `.claude/skills/`, so each skill also has a pointer `.claude/skills/<name>/SKILL.md`, with the same front matter and a body that sends the agent to the real file. Add one with every new skill; `_shared/check-skills.py` checks the pair. Every skill follows [the shared steps](.agents/skills/_shared/pr.md) and ends with an open PR. The skills that destroy, retire, cancel or delete carry `disable-model-invocation: true`: start one only when the user names it (`/stamp-destroy`), never on your own.
+
+`.claude/settings.json` denies `tofu apply`, `terraform`, the `az` verbs that change resources, merging and approving PRs, and editing a stamp's generated `main.tf` and lock file: the rules above, enforced.
 
 | Skill | Use when |
 | --- | --- |

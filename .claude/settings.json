@@ -1,8 +1,33 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "allow": [
       "Bash(git rebase *)",
-      "Bash(gh pr *)"
+      "Bash(gh pr *)",
+      "Bash(python .agents/skills/_shared/*)",
+      "Bash(python3 .agents/skills/_shared/*)",
+      "Bash(tofu fmt *)"
+    ],
+    "deny": [
+      "Bash(tofu apply*)",
+      "Bash(tofu destroy*)",
+      "Bash(tofu import*)",
+      "Bash(tofu state *)",
+      "Bash(tofu -chdir=* apply*)",
+      "Bash(tofu -chdir=* destroy*)",
+      "Bash(terraform *)",
+      "Bash(gh pr merge*)",
+      "Bash(gh pr review * --approve*)",
+      "Bash(gh pr review --approve*)",
+      "Bash(az * create*)",
+      "Bash(az * delete*)",
+      "Bash(az * update*)",
+      "Bash(az * set*)",
+      "Bash(az * assign*)",
+      "Edit(/stamps/**/main.tf)",
+      "Write(/stamps/**/main.tf)",
+      "Edit(/stamps/**/.terraform.lock.hcl)",
+      "Write(/stamps/**/.terraform.lock.hcl)"
     ]
   }
 }
