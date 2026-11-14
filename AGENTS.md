@@ -117,6 +117,8 @@ Run the ones that are installed. The PR's plan runs all of them anyway.
 tofu fmt -check -recursive
 python .agents/skills/_shared/check-catalog.py       # the catalog rules, as the plan runs them (needs conftest)
 python .agents/skills/_shared/check-skills.py        # every skill has its .claude/skills pointer, with the same front matter
+ruff check . && ruff format --check .                 # when a .py file changed (settings in ruff.toml)
+python .github/scripts/check-pins.py                  # when .github/ changed: every uses: pinned by full SHA
 conftest verify --policy policy                       # when policy/ changed (needs conftest)
 tofu -chdir=<root> init -backend=false && tofu -chdir=<root> validate   # each changed .tf root
 ```

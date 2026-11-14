@@ -8,6 +8,7 @@ address plan (AGENTS.md, "Address plan"). Reads only; prints one CIDR.
 
 Run from the root of tl-cloud-infrastructure. Needs PyYAML.
 """
+
 import argparse
 import ipaddress
 import sys
@@ -39,8 +40,8 @@ def main():
     sub = p.add_subparsers(dest="kind", required=True)
     h = sub.add_parser("hub")
     h.add_argument("cloud", choices=sorted(HUB_HALVES))
-    l = sub.add_parser("landing-zone")
-    l.add_argument("envtype", choices=["prod", "sandbox"])
+    lz = sub.add_parser("landing-zone")
+    lz.add_argument("envtype", choices=["prod", "sandbox"])
     s = sub.add_parser("stamp")
     s.add_argument("lz")
     s.add_argument("--prefix", type=int, default=27)

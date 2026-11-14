@@ -4,6 +4,7 @@
 that Claude Code lists every skill (it reads only .claude/skills/).
 
 Run from the repository root: python3 <this file>. Exits 1 on a mismatch."""
+
 import os
 import pathlib
 import sys

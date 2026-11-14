@@ -17,6 +17,7 @@ concurrency:
 env:
   CONFTEST_VERSION: 0.71.0
   ACTIONLINT_VERSION: 1.7.12
+  RUFF_VERSION: 0.17.4
 
 jobs:
   detect:
@@ -28,6 +29,7 @@ jobs:
       roots: ${{ steps.detect.outputs.roots }}
       policy: ${{ steps.detect.outputs.policy }}
       workflows: ${{ steps.detect.outputs.workflows }}
+      python: ${{ steps.detect.outputs.python }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -48,6 +50,7 @@ jobs:
             echo "roots=$roots"
             echo "policy=$(grep -q '^policy/' <<< "$changed" && echo true || echo false)"
             echo "workflows=$(grep -qE '^(\.github/|renovate\.json$)' <<< "$changed" && echo true || echo false)"
+            echo "python=$(grep -qE '(\.py|^ruff\.toml)$' <<< "$changed" && echo true || echo false)"
           } >> "$GITHUB_OUTPUT"
 
   roots:
@@ -98,17 +101,36 @@ jobs:
           persist-credentials: false
       - run: bash .github/scripts/install-tool.sh actionlint "$ACTIONLINT_VERSION"
       - run: actionlint -no-color
+      # Every uses: pinned by its full commit SHA, with the version in a comment.
+      - run: python3 .github/scripts/check-pins.py
+
+  python:
+    name: lint python
+    needs: detect
+    if: needs.detect.outputs.python == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - run: bash .github/scripts/install-tool.sh ruff "$RUFF_VERSION"
+      # The settings are in ruff.toml (.claude/rules/coding-python.md).
+      - run: ruff check --output-format github .
+      - run: ruff format --check .
 
   plan:
     name: plan
-    needs: [detect, roots, lint]
+    needs: [detect, roots, lint, python]
     if: always()
     runs-on: ubuntu-24.04
     steps:
       - env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
-          echo "detect, roots, lint: $RESULTS"
+          echo "detect, roots, lint, python: $RESULTS"
           if grep -qE 'failure|cancelled' <<< "$RESULTS"; then exit 1; fi
 
   conftest:

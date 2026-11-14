@@ -2,9 +2,11 @@
 # Installs a pinned release of a CLI the workflows use, after checking its
 # SHA-256 against the release's checksum file (08 section 3, Tool versions).
 #
-#   install-tool.sh conftest|trivy|actionlint <version>
+#   install-tool.sh conftest|trivy|actionlint|ruff <version>
 set -euo pipefail
 tool=$1 version=$2
+# The binary's path inside the archive, and how many leading folders to strip.
+member=$tool strip=0
 case "$tool" in
   conftest)
     base="https://github.com/open-policy-agent/conftest/releases/download/v$version"
@@ -15,6 +17,10 @@ case "$tool" in
   actionlint)
     base="https://github.com/rhysd/actionlint/releases/download/v$version"
     asset="actionlint_${version}_linux_amd64.tar.gz" sums="actionlint_${version}_checksums.txt" ;;
+  ruff)
+    base="https://github.com/astral-sh/ruff/releases/download/$version"
+    asset="ruff-x86_64-unknown-linux-gnu.tar.gz" sums=sha256.sum
+    member="ruff-x86_64-unknown-linux-gnu/ruff" strip=1 ;;
   *) echo "unknown tool: $tool" >&2; exit 2 ;;
 esac
 dir="$RUNNER_TEMP/tools/$tool"
@@ -22,6 +28,7 @@ mkdir -p "$dir"
 cd "$dir"
 curl -fsSL -o "$asset" "$base/$asset"
 curl -fsSL -o sums.txt "$base/$sums"
-grep " $asset\$" sums.txt | sha256sum -c -
-tar -xzf "$asset" "$tool"
+# A checksum line is "<sha256>  <asset>", or "<sha256> *<asset>" in binary mode.
+grep -E "[ *]$asset\$" sums.txt | sha256sum -c -
+tar -xzf "$asset" --strip-components="$strip" "$member"
 echo "$dir" >> "$GITHUB_PATH"

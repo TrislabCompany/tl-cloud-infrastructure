@@ -11,6 +11,7 @@ Run from the root of tl-cloud-infrastructure. Needs PyYAML and conftest; it
 says so and exits 2 when conftest is missing, and the PR's plan runs the
 same rules.
 """
+
 import argparse
 import glob
 import json
@@ -37,7 +38,7 @@ def work_files():
     for pattern in ["catalog/*.yaml", "landing-zones/*.yaml", "stamps/*/*/stamp.yaml"]:
         for f in glob.glob(pattern):
             f = f.replace("\\", "/")
-            out[f] = (lambda f=f: open(f, encoding="utf-8").read())
+            out[f] = lambda f=f: open(f, encoding="utf-8").read()
     return out
 
 
@@ -52,7 +53,8 @@ def write(datadir, side, files):
             doc, name = {side: {"lz_yaml": {lz: yaml.safe_load(read()) or {}}}}, f"{side}-lz-{lz}"
         elif parts[0] == "stamps" and len(parts) == 4 and parts[3] == "stamp.yaml":
             stamp = f"{parts[1]}/{parts[2]}"
-            doc, name = {side: {"stamp_yaml": {stamp: yaml.safe_load(read()) or {}}}}, f"{side}-stamp-{parts[1]}--{parts[2]}"
+            doc = {side: {"stamp_yaml": {stamp: yaml.safe_load(read()) or {}}}}
+            name = f"{side}-stamp-{parts[1]}--{parts[2]}"
         if doc is not None:
             with open(os.path.join(datadir, name + ".json"), "w", encoding="utf-8") as f:
                 json.dump(doc, f, default=str)
@@ -76,8 +78,9 @@ def main():
         empty = os.path.join(tmp, "empty.json")
         with open(empty, "w") as f:
             f.write("{}")
-        r = subprocess.run([conftest, "test", "--no-color", empty, "--policy", "policy",
-                            "--data", datadir, "--namespace", "catalog"])
+        r = subprocess.run(
+            [conftest, "test", "--no-color", empty, "--policy", "policy", "--data", datadir, "--namespace", "catalog"]
+        )
         sys.exit(r.returncode)
 
 
