@@ -1,0 +1,8 @@
+# ruff for the Python helpers in .agents/skills/_shared/ (.claude/rules/coding-python.md).
+# The plan workflow runs `ruff check` and `ruff format --check` when a .py file changes.
+line-length = 120
+target-version = "py311"
+
+[lint]
+# pycodestyle, pyflakes, import order, bugbear.
+select = ["E", "F", "W", "I", "B"]
