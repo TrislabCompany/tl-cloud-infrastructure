@@ -60,6 +60,10 @@ tenants:
           - { name: dev, hostname: dev.dragonja.si }
           - { name: staging, hostname: staging.dragonja.si }
           - { name: production, hostname: dragonja.si, access: public }
+  - slug: astragroup
+    code: ast
+    state: active
+    products: []               # corporate-site in the next PR: global/edge reads grp-cust-ast-admins, which identity creates here
   - slug: dragonja
     code: dra
     state: retired             # Trislab publishes dragonja.si itself, as its product dragonja
