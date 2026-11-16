@@ -1,0 +1,5 @@
+# The records of strehanakljuc.si, a new zone with no site or mail yet. The site will be
+# the production of the Pages site astragroup-website-strehanakljuc: at the cutover its
+# apex record comes from catalog/products.yaml (pages.tf). Until then www only
+# carries the redirect to strehanakljuc.si in catalog/domains.yaml (ADR 0057).
+www: { name: www.strehanakljuc.si, type: CNAME, content: strehanakljuc.si, proxied: true }
