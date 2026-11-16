@@ -92,6 +92,12 @@ resource "github_repository" "this" {
   name       = each.key
   visibility = "public"
 
+  # A merged PR's branch is deleted, so a PR stacked on it moves to main
+  # instead of merging into a branch nothing deploys from. Set only when the
+  # repository is created (ignored below, ADR 0038); a repository created
+  # before it was switched on by hand once.
+  delete_branch_on_merge = true
+
   template {
     owner      = local.org
     repository = each.value.template
@@ -99,8 +105,8 @@ resource "github_repository" "this" {
 
   # The template is read only when the repository is created (07 section 11).
   # tl-github-plan can't read the merge settings, so they would always show as
-  # changing; the repository keeps GitHub's defaults (ADR 0038) or what its
-  # team sets in its settings, such as deleting merged branches.
+  # changing; the repository keeps GitHub's defaults (ADR 0038), except
+  # delete_branch_on_merge above, or what its team sets in its settings.
   lifecycle {
     ignore_changes = [
       template,
