@@ -1,56 +1,37 @@
-# The records astragroup.si held at NeoServ (ns33/ns34.neoserv.si) before
-# Cloudflare, from NeoServ's zone export of 2026-11-16, checked against
-# ns33.neoserv.si. The site is on NeoServ's shared hosting 152.89.234.70 and its
-# mail on 152.89.235.115. The site has a valid certificate for the domain and
-# its subdomains, so its web names are proxied; the rest stay as NeoServ serves
-# them. NeoServ publishes no DMARC.
+# The records of astragroup.si, from NeoServ's zone export of 2026-11-16
+# (ns33/ns34.neoserv.si), checked against ns33.neoserv.si and cleaned up. The
+# site is on NeoServ's web hosting 152.89.234.70 until the cutover to Pages. The
+# mail stays on NeoServ's mail server 152.89.235.115 (eh3.neoserv.si), which has
+# its own certificates for mail and webmail. The web hosting has a valid
+# certificate for the site, so its web names are proxied; the rest are DNS-only.
 #
-# Not copied: _acme-challenge and _cpanel-dcv-test-record, which cPanel AutoSSL
-# writes for each certificate it orders. Once the zone is on Cloudflare, AutoSSL
-# can't write them, and it validates names over HTTP instead.
+# Not copied from NeoServ:
+# - whm and webdisk: WHM isn't open to a shared-hosting account, and WebDisk
+#   isn't used.
+# - The 19 names under mail.astragroup.si (www.mail, cpanel.mail, its SPF, DKIM,
+#   autodiscover and CalDAV/CardDAV): cPanel made them for a subdomain "mail" on
+#   the web hosting. No mail uses @mail.astragroup.si; mail.astragroup.si is
+#   only the mail server's name.
+# - _acme-challenge and _cpanel-dcv-test-record, which cPanel AutoSSL writes for
+#   each certificate it orders.
+# Changed: the SPF record. NeoServ's include covers 152.89.232.0/22, so the
+# ip4, a and mx terms were already in it, and a would let the apex's address
+# (Cloudflare, then Pages) send mail. A DMARC record is added; NeoServ had none.
 
-# The site and the hosting.
+# The site and the web hosting, until the cutover.
 apex: { name: astragroup.si, type: A, content: 152.89.234.70, proxied: true }
 www: { name: www.astragroup.si, type: CNAME, content: astragroup.si, proxied: true }
 ftp: { name: ftp.astragroup.si, type: A, content: 152.89.234.70 }
 cpanel: { name: cpanel.astragroup.si, type: A, content: 152.89.234.70 }
-whm: { name: whm.astragroup.si, type: A, content: 152.89.234.70 }
-webdisk: { name: webdisk.astragroup.si, type: A, content: 152.89.234.70 }
 
 # Mail at NeoServ.
 mx: { name: astragroup.si, type: MX, priority: 0, content: mail.astragroup.si }
 mail: { name: mail.astragroup.si, type: A, content: 152.89.235.115 }
 webmail: { name: webmail.astragroup.si, type: A, content: 152.89.235.115 }
-spf: { name: astragroup.si, type: TXT, content: "v=spf1 +a +mx +ip4:152.89.234.70 include:_spf.mail-neoserv.si +ip4:152.89.234.74 +ip4:152.89.234.250 ~all" }
-spf-mail: { name: mail.astragroup.si, type: TXT, content: "v=spf1 +a +mx +ip4:152.89.234.70 include:_spf.mail-neoserv.si +ip4:152.89.234.74 +ip4:152.89.234.250 ~all" }
+spf: { name: astragroup.si, type: TXT, content: "v=spf1 include:_spf.mail-neoserv.si ~all" }
+dmarc: { name: _dmarc.astragroup.si, type: TXT, content: "v=DMARC1; p=none" }
 dkim-default: { name: default._domainkey.astragroup.si, type: TXT, content: "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzecAciDosdeH2jBbpS7b0+LYPfn8oPWNRXFeBI5st1WSIubLIacsFRSgRy0u7S3p4h7Q++1HkZ9nfrJyDMtXXFAy64xiunbixslWZmQGEoTMuXjUmAzKCm+QF7HNKVH15iYODQXzVHAlLLBvv+1kJQ2z9ypHkvwnWEISuGlR4+uIuu5SD+nzu9e1VS0uE8Mv3IbI4ScNIwuXAi4uT2C0SxKzjpvjE27oooAjkgwJA3Jy60OeqP3FC3I3t1PAp47N8kLlkGj7iUjszf87EwyQpoxilxetLu/Ph6rvrmpzMeLEmWyZhsriHTLSeIl6Vgczm4+3bfn4VGj2jHx595m0GwIDAQAB;" }
-dkim-default-mail: { name: default._domainkey.mail.astragroup.si, type: TXT, content: "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsrhIHqkKdx6KvFfZPSDgDKcPnPZxY0kBkbd4M3EsdRNgra1Si+4lrEuNUIVuHJh1oFC5wXtjnuAYhxgHaexbPLIp+Xc0oRwC+Sas1587686qVzEw7Uq7+SvQf7kgf5xcAh8kLYZzup8ySiy/9znUoTgujJHckQxTgGoYRX3Vf/ZhIQkrcDFTgyJtM7hdyLUWLMrC8gkHkhZlqWx8KkDWQhkSpMeyrnELMdbguTEQF3pWOcClUnFY4LOBGlO51lazS2cYjWaGOvkySEEq3jhduWgZz2vdQp9Tx+HtwBWgeVlMj9wr/Hjp7HBWVBGVT1nmnjFq03XPfpxEg8VS1ywe4wIDAQAB;" }
 
-# Mail client set-up and groupware (cPanel).
+# Calendars and contacts (cPanel groupware) on the mail server.
 cpcalendars: { name: cpcalendars.astragroup.si, type: A, content: 152.89.235.115 }
 cpcontacts: { name: cpcontacts.astragroup.si, type: A, content: 152.89.235.115 }
-
-# The names cPanel made for its subdomain mail.astragroup.si. www.mail has a
-# valid certificate but serves no site, so it stays DNS-only like the rest.
-# NeoServ's SRV records point at astragroup.si. That name is proxied here, and
-# Cloudflare doesn't pass the DAV ports 2079 and 2080, so they point at
-# webdisk.astragroup.si instead: the same host and the same cPanel DAV service,
-# DNS-only, and covered by the certificate.
-www-mail: { name: www.mail.astragroup.si, type: A, content: 152.89.234.70 }
-autodiscover-mail: { name: autodiscover.mail.astragroup.si, type: A, content: 152.89.234.70 }
-autoconfig-mail: { name: autoconfig.mail.astragroup.si, type: A, content: 152.89.234.70 }
-cpanel-mail: { name: cpanel.mail.astragroup.si, type: A, content: 152.89.234.70 }
-whm-mail: { name: whm.mail.astragroup.si, type: A, content: 152.89.234.70 }
-webdisk-mail: { name: webdisk.mail.astragroup.si, type: A, content: 152.89.234.70 }
-webmail-mail: { name: webmail.mail.astragroup.si, type: A, content: 152.89.235.115 }
-cpcalendars-mail: { name: cpcalendars.mail.astragroup.si, type: A, content: 152.89.234.70 }
-cpcontacts-mail: { name: cpcontacts.mail.astragroup.si, type: A, content: 152.89.234.70 }
-srv-autodiscover-mail: { name: _autodiscover._tcp.mail.astragroup.si, type: SRV, priority: 0, data: { weight: 0, port: 443, target: cpanelemaildiscovery.cpanel.net } }
-srv-caldav-mail: { name: _caldav._tcp.mail.astragroup.si, type: SRV, priority: 0, data: { weight: 0, port: 2079, target: webdisk.astragroup.si } }
-srv-caldavs-mail: { name: _caldavs._tcp.mail.astragroup.si, type: SRV, priority: 0, data: { weight: 0, port: 2080, target: webdisk.astragroup.si } }
-srv-carddav-mail: { name: _carddav._tcp.mail.astragroup.si, type: SRV, priority: 0, data: { weight: 0, port: 2079, target: webdisk.astragroup.si } }
-srv-carddavs-mail: { name: _carddavs._tcp.mail.astragroup.si, type: SRV, priority: 0, data: { weight: 0, port: 2080, target: webdisk.astragroup.si } }
-caldav-path-mail: { name: _caldav._tcp.mail.astragroup.si, type: TXT, content: "path=/" }
-caldavs-path-mail: { name: _caldavs._tcp.mail.astragroup.si, type: TXT, content: "path=/" }
-carddav-path-mail: { name: _carddav._tcp.mail.astragroup.si, type: TXT, content: "path=/" }
-carddavs-path-mail: { name: _carddavs._tcp.mail.astragroup.si, type: TXT, content: "path=/" }
