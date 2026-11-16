@@ -26,6 +26,12 @@ domains:
     search_console: { property: sc-domain:dragonja.si, owner: trislab, verification: google }
     dnssec: true
     bots: { fight_mode: true, block_ai: true }
+  - name: astragroup.si
+    tenant: astragroup
+    redirects:
+      - { from: www.astragroup.si, to: astragroup.si }
+    dnssec: true
+    bots: { fight_mode: false, block_ai: true }   # the site stays on its hosting until the cutover
   - name: juskoski.si
     tenant: juskoski
   - name: ldistragracisce.si

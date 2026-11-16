@@ -60,6 +60,20 @@ tenants:
           - { name: dev, hostname: dev.dragonja.si }
           - { name: staging, hostname: staging.dragonja.si }
           - { name: production, hostname: dragonja.si, access: public }
+  - slug: astragroup
+    code: ast
+    state: active
+    products:
+      - slug: corporate-site
+        repo: astragroup-website-corporate-site
+        template: tl-template-website
+        maintainers: [tl-janskof]
+        state: active
+        domain: astragroup.si
+        environments:
+          - { name: dev, hostname: dev.astragroup.si }
+          - { name: staging, hostname: staging.astragroup.si }
+          - { name: production, hostname: production.astragroup.si, web_analytics: true }   # astragroup.si at the cutover
   - slug: dragonja
     code: dra
     state: retired             # Trislab publishes dragonja.si itself, as its product dragonja

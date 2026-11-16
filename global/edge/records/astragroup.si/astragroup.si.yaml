@@ -1,0 +1,25 @@
+# The records astragroup.si held at NeoServ (ns33/ns34.neoserv.si) before
+# Cloudflare, read from public DNS on 2026-11-16. The site is on NeoServ's
+# shared hosting 152.89.234.70 and its mail on 152.89.235.115. The site has a
+# valid certificate for the domain and its subdomains, so its web names are
+# proxied; the rest stay as NeoServ serves them. NeoServ publishes no DMARC.
+
+# The site and the hosting.
+apex: { name: astragroup.si, type: A, content: 152.89.234.70, proxied: true }
+www: { name: www.astragroup.si, type: CNAME, content: astragroup.si, proxied: true }
+ftp: { name: ftp.astragroup.si, type: A, content: 152.89.234.70 }
+cpanel: { name: cpanel.astragroup.si, type: A, content: 152.89.234.70 }
+whm: { name: whm.astragroup.si, type: A, content: 152.89.234.70 }
+webdisk: { name: webdisk.astragroup.si, type: A, content: 152.89.234.70 }
+
+# Mail at NeoServ.
+mx: { name: astragroup.si, type: MX, priority: 0, content: mail.astragroup.si }
+mail: { name: mail.astragroup.si, type: A, content: 152.89.235.115 }
+webmail: { name: webmail.astragroup.si, type: A, content: 152.89.235.115 }
+spf: { name: astragroup.si, type: TXT, content: "v=spf1 +a +mx +ip4:152.89.234.70 include:_spf.mail-neoserv.si +ip4:152.89.234.74 +ip4:152.89.234.250 ~all" }
+spf-mail: { name: mail.astragroup.si, type: TXT, content: "v=spf1 +a +mx +ip4:152.89.234.70 include:_spf.mail-neoserv.si +ip4:152.89.234.74 +ip4:152.89.234.250 ~all" }
+dkim-default: { name: default._domainkey.astragroup.si, type: TXT, content: "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzecAciDosdeH2jBbpS7b0+LYPfn8oPWNRXFeBI5st1WSIubLIacsFRSgRy0u7S3p4h7Q++1HkZ9nfrJyDMtXXFAy64xiunbixslWZmQGEoTMuXjUmAzKCm+QF7HNKVH15iYODQXzVHAlLLBvv+1kJQ2z9ypHkvwnWEISuGlR4+uIuu5SD+nzu9e1VS0uE8Mv3IbI4ScNIwuXAi4uT2C0SxKzjpvjE27oooAjkgwJA3Jy60OeqP3FC3I3t1PAp47N8kLlkGj7iUjszf87EwyQpoxilxetLu/Ph6rvrmpzMeLEmWyZhsriHTLSeIl6Vgczm4+3bfn4VGj2jHx595m0GwIDAQAB;" }
+
+# Mail client set-up and groupware (cPanel).
+cpcalendars: { name: cpcalendars.astragroup.si, type: A, content: 152.89.235.115 }
+cpcontacts: { name: cpcontacts.astragroup.si, type: A, content: 152.89.235.115 }
