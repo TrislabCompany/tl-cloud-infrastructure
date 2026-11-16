@@ -26,8 +26,8 @@ esac
 dir="$RUNNER_TEMP/tools/$tool"
 mkdir -p "$dir"
 cd "$dir"
-# GitHub's release downloads fail now and then with a 403 or 5xx that a retry
-# a few seconds later doesn't get; one failed download used to fail the whole
+# GitHub's release downloads fail now and then with a 403 or 5xx that passes
+# on a retry a few seconds later; one failed download used to fail the whole
 # plan or apply (tl-cloud-infrastructure#131).
 fetch() {
   curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 --retry-max-time 120 -o "$1" "$2" || {
