@@ -1,0 +1,36 @@
+# The records of rehabo.si, from public lookups of 2026-11-16 at
+# ns1.easyname.eu, the domain's DNS host. The site and its form backend are on
+# a Plesk/IIS host, 212.44.113.144, until the cutover to Pages. Mail is on
+# Google Workspace.
+#
+# easyname's zone export wasn't available yet. A lookup lists only the names
+# someone asks for, so the export is compared with this file before the
+# nameservers move (tl-product-ideas docs/website-journey.md section 7).
+# Names looked up and not found: mail, webmail, ftp, autodiscover, autoconfig,
+# _dmarc, and the DKIM selectors google and default.
+#
+# The host has a valid certificate for the apex, so the apex is proxied. It has
+# none for www, which only carries the redirect to rehabo.si in
+# catalog/domains.yaml: the edge answers it before the origin. The form backend
+# stays DNS-only and unchanged until it is switched off at the cutover.
+# Added: a DMARC record. easyname had none.
+
+# The site and its form backend, until the cutover.
+apex: { name: rehabo.si, type: A, content: 212.44.113.144, proxied: true }
+www: { name: www.rehabo.si, type: CNAME, content: rehabo.si, proxied: true }
+rehaboapi: { name: rehaboapi.rehabo.si, type: A, content: 212.44.113.144 }
+
+# Mail: Google Workspace.
+gmail-aspmx: { name: rehabo.si, type: MX, priority: 1, content: aspmx.l.google.com }
+gmail-alt1: { name: rehabo.si, type: MX, priority: 5, content: alt1.aspmx.l.google.com }
+gmail-alt2: { name: rehabo.si, type: MX, priority: 5, content: alt2.aspmx.l.google.com }
+gmail-alt3: { name: rehabo.si, type: MX, priority: 10, content: alt3.aspmx.l.google.com }
+gmail-alt4: { name: rehabo.si, type: MX, priority: 10, content: alt4.aspmx.l.google.com }
+spf: { name: rehabo.si, type: TXT, content: "v=spf1 ip4:209.85.128.48 include:_spf.google.com include:spf.easyname.com -all" }
+dmarc: { name: _dmarc.rehabo.si, type: TXT, content: "v=DMARC1; p=none" }
+
+# Verifications.
+google: { name: rehabo.si, type: TXT, content: "google-site-verification=DQyOczKDmRX1X-bi8_QakjE8BT3kIy0APNErFoN61zY" }
+google-2: { name: rehabo.si, type: TXT, content: "google-site-verification=WcxCEUR_3vx2mxTrTrFQj0qjBtr-1ubq1gRZdScXJdo" }
+# An Azure App Service domain verification, kept while the form backend runs.
+azure: { name: rehabo.si, type: TXT, content: "rehabo.azurewebsites.net" }

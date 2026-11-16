@@ -120,3 +120,7 @@ tenants:
     code: spd
     state: active
     products: []
+  - slug: rehabo
+    code: reh
+    state: active
+    products: []

@@ -54,5 +54,11 @@ domains:
     bots: { fight_mode: false, block_ai: true }   # the site stays on the hosting until the cutover
   - name: spds.si
     tenant: spds
+  - name: rehabo.si
+    tenant: rehabo
+    redirects:
+      - { from: www.rehabo.si, to: rehabo.si }
+    dnssec: true
+    bots: { fight_mode: false, block_ai: true }   # the site stays on its hosting until the cutover
 
 stamp_tenants: []
