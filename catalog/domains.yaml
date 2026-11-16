@@ -32,6 +32,12 @@ domains:
       - { from: www.astragroup.si, to: astragroup.si }
     dnssec: true
     bots: { fight_mode: false, block_ai: true }   # the site stays on its hosting until the cutover
+  - name: strehanakljuc.si
+    tenant: astragroup
+    redirects:
+      - { from: www.strehanakljuc.si, to: strehanakljuc.si }
+    dnssec: true
+    bots: { fight_mode: true, block_ai: true }
   - name: juskoski.si
     tenant: juskoski
   - name: ldistragracisce.si
