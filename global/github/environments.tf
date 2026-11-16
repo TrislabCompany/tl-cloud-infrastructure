@@ -61,6 +61,11 @@ resource "github_repository_environment" "this" {
       teams = [tonumber(data.github_team.devops.id), tonumber(github_team.product[local.repos[each.value.repo].team].id)]
     }
   }
+
+  # A team is a required reviewer only once it has access to the repository;
+  # without it GitHub drops the team and refuses the empty reviewer list (422)
+  # when the repository and its Environments are created in one apply.
+  depends_on = [github_team_repository.product, github_team_repository.devops]
 }
 
 resource "github_actions_environment_variable" "this" {

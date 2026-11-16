@@ -48,6 +48,11 @@ resource "github_repository_environment" "pages" {
     }
   }
 
+  # A team is a required reviewer only once it has access to the repository;
+  # without it GitHub drops the team and refuses the empty reviewer list (422)
+  # when the repository and its Environments are created in one apply.
+  depends_on = [github_team_repository.product, github_team_repository.devops]
+
   deployment_branch_policy {
     protected_branches     = false
     custom_branch_policies = true

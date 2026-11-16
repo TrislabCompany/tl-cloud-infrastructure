@@ -71,7 +71,17 @@ tenants:
   - slug: ldistragracisce
     code: ldg
     state: active
-    products: []
+    products:
+      - slug: corporate-site
+        repo: ldistragracisce-website-corporate-site
+        template: tl-template-website
+        maintainers: [tl-janskof]
+        state: active
+        domain: ldistragracisce.si
+        environments:
+          - { name: dev, hostname: dev.ldistragracisce.si }
+          - { name: staging, hostname: staging.ldistragracisce.si }
+          - { name: production, hostname: production.ldistragracisce.si, web_analytics: true }   # ldistragracisce.si at the cutover
   - slug: spds
     code: spd
     state: active
