@@ -63,6 +63,12 @@ tenants:
           - { name: dev, hostname: dev.dragonja.si }
           - { name: staging, hostname: staging.dragonja.si }
           - { name: production, hostname: dragonja.si, access: public }
+      - slug: form-handler     # the shared form Worker of the sites on Pages (D-14, D-32); its environments come later
+        repo: trislab-worker-form-handler
+        template: none
+        maintainers: [tl-janskof]
+        state: active
+        domain: trislab.com
   - slug: astragroup
     code: ast
     state: active
