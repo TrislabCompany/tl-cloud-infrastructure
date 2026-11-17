@@ -1,0 +1,5 @@
+# The records of fasadanakljuc.si, a new zone with no site or mail yet. The site will be
+# the production of the Pages site astragroup-website-fasadanakljuc: at the cutover its
+# apex record comes from catalog/products.yaml (pages.tf). Until then www only
+# carries the redirect to fasadanakljuc.si in catalog/domains.yaml (ADR 0057).
+www: { name: www.fasadanakljuc.si, type: CNAME, content: fasadanakljuc.si, proxied: true }

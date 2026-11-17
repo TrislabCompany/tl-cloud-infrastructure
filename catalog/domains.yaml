@@ -38,6 +38,12 @@ domains:
       - { from: www.strehanakljuc.si, to: strehanakljuc.si }
     dnssec: true
     bots: { fight_mode: true, block_ai: true }
+  - name: fasadanakljuc.si
+    tenant: astragroup
+    redirects:
+      - { from: www.fasadanakljuc.si, to: fasadanakljuc.si }
+    dnssec: true
+    bots: { fight_mode: true, block_ai: true }
   - name: juskoski.si
     tenant: juskoski
   - name: ldistragracisce.si

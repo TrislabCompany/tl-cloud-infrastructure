@@ -84,6 +84,16 @@ tenants:
           - { name: dev, hostname: dev.strehanakljuc.si, turnstile: true }
           - { name: staging, hostname: staging.strehanakljuc.si, turnstile: true }
           - { name: production, hostname: production.strehanakljuc.si, web_analytics: true, turnstile: true }   # strehanakljuc.si at the cutover
+      - slug: fasadanakljuc
+        repo: astragroup-website-fasadanakljuc
+        template: tl-template-website
+        maintainers: [tl-janskof]
+        state: active
+        domain: fasadanakljuc.si
+        environments:
+          - { name: dev, hostname: dev.fasadanakljuc.si, turnstile: true }
+          - { name: staging, hostname: staging.fasadanakljuc.si, turnstile: true }
+          - { name: production, hostname: production.fasadanakljuc.si, web_analytics: true, turnstile: true }   # fasadanakljuc.si at the cutover
   - slug: dragonja
     code: dra
     state: retired             # Trislab publishes dragonja.si itself, as its product dragonja
