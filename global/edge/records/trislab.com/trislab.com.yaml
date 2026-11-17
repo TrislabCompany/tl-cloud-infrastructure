@@ -30,3 +30,6 @@ dkim-default: { name: default._domainkey.trislab.com, type: TXT, content: "v=DKI
 dkim-resend: { name: resend._domainkey.trislab.com, type: TXT, content: "p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC1igfSIt1T9K02kM+8rLlOEJaLhE9bVco9CUlGUYf6Nd30SHLAwQr5jhw501aTjn7LKrLwFVPytre63NuRZFRZAo8rgkpTdHbEPjoyXmsKzqY3SAWp7sSpZlscynyJ63y5SqYFgwHS+0iwMHwZoTD/Sb2YsW3upKhfdQDOdiwNUwIDAQAB" }
 send-mx: { name: send.trislab.com, type: MX, priority: 10, content: feedback-smtp.eu-west-1.amazonses.com }
 send-spf: { name: send.trislab.com, type: TXT, content: "v=spf1 include:amazonses.com ~all" }
+# Resend's return path of trislab.com: SPF and bounces. Not mail.trislab.com,
+# which is the hosting's mail server.
+bounce: { name: bounce.trislab.com, type: CNAME, content: send.forge.rmta.net }
