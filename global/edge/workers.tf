@@ -42,12 +42,54 @@ resource "cloudflare_worker" "this" {
   subdomain     = { enabled = false, previews_enabled = false }
 }
 
+# Cloudflare attaches a Custom Domain only to a Worker that has a deployment,
+# so a new Worker first gets a placeholder that answers 503 until wrangler
+# deploys its code. The placeholder is created once and then forgotten
+# (removed blocks), never kept: Cloudflare keeps only recent deployments, and
+# the provider would recreate a forgotten one over the real code. A new worker
+# takes two applies: one with these resources, one with the removed blocks.
+locals {
+  worker_placeholder = <<-EOT
+    export default {
+      fetch() {
+        return Response.json({ ok: false, version: "none", issues: ["no version deployed yet"] }, { status: 503 });
+      },
+    };
+  EOT
+}
+
+resource "cloudflare_worker_version" "placeholder" {
+  for_each           = local.worker_environments
+  account_id         = var.cloudflare_account_id
+  worker_id          = cloudflare_worker.this[each.key].id
+  compatibility_date = "2026-10-26"
+  main_module        = "index.js"
+  modules = [{
+    name           = "index.js"
+    content_type   = "application/javascript+module"
+    content_base64 = base64encode(local.worker_placeholder)
+  }]
+}
+
+resource "cloudflare_workers_deployment" "placeholder" {
+  for_each    = local.worker_environments
+  account_id  = var.cloudflare_account_id
+  script_name = cloudflare_worker.this[each.key].name
+  strategy    = "percentage"
+  versions = [{
+    percentage = 100
+    version_id = cloudflare_worker_version.placeholder[each.key].id
+  }]
+}
+
 resource "cloudflare_workers_custom_domain" "this" {
   for_each   = { for k, w in local.worker_environments : k => w if w.zone != null }
   account_id = var.cloudflare_account_id
   zone_id    = cloudflare_zone.this[each.value.zone].id
   hostname   = each.value.hostname
   service    = cloudflare_worker.this[each.key].name
+
+  depends_on = [cloudflare_workers_deployment.placeholder]
 
   # A Custom Domain creates the hostname's DNS record, so no record of
   # global/edge/records/ and no site may have its name.
