@@ -69,7 +69,7 @@ schemas := {
 		"slug": slug, "code": `^[a-z]{2,3}$`, "state": `^(active|retired)$`, "products": "array",
 	}},
 	"products": {"file": "products.yaml", "section": 11, "required": {"slug", "repo", "template", "maintainers", "state", "domain"}, "fields": {
-		"slug": slug, "code": `^[a-z]{2,3}$`, "repo": slug, "template": `^tl-template-(website|webapp|saas)$`,
+		"slug": slug, "code": `^[a-z]{2,3}$`, "repo": slug, "template": `^(tl-template-(website|webapp|saas)|none)$`,
 		"maintainers": "array", "state": `^(active|archived)$`, "archived_on": `^[0-9]{4}-[0-9]{2}-[0-9]{2}$`,
 		"domain": fqdn, "environments": "array",
 	}},
@@ -308,9 +308,21 @@ deny contains msg if {
 deny contains msg if {
 	some [t, p] in product_rows
 	is_string(p.template)
+	p.template != "none"
 	want := sprintf("%v-%v-%v", [t.slug, trim_prefix(p.template, "tl-template-"), p.slug])
 	p.repo != want
 	msg := sprintf("catalog/products.yaml: %v must be named %v, from its tenant, its template and its product (07 section 11)", [p.repo, want])
+}
+
+# A worker, a shared service on Cloudflare Workers, has no template until
+# tl-template-worker exists (template: none). It starts as an empty repository
+# named <tenant>-worker-<product>.
+deny contains msg if {
+	some [t, p] in product_rows
+	p.template == "none"
+	want := sprintf("%v-worker-%v", [t.slug, p.slug])
+	p.repo != want
+	msg := sprintf("catalog/products.yaml: %v has no template, so it is a worker and must be named %v (07 section 11)", [p.repo, want])
 }
 
 deny contains msg if {

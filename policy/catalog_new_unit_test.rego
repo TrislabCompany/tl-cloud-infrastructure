@@ -11,6 +11,8 @@ region_list := [
 
 corporate_site := {"slug": "corporate-site", "code": "web", "repo": "trislab-website-corporate-site", "template": "tl-template-website", "maintainers": ["octo-anna"], "state": "active", "domain": "trislab.com"}
 
+form_handler := {"slug": "form-handler", "repo": "trislab-worker-form-handler", "template": "none", "maintainers": ["octo-anna"], "state": "active", "domain": "trislab.com"}
+
 construction_product := {"slug": "construction", "code": "con", "repo": "trislab-saas-construction", "template": "tl-template-saas", "maintainers": ["octo-anna", "octo-marko"], "state": "active", "domain": "construction.com"}
 
 # catalog/products.yaml: trislab has no code, a client tenant has one, and a
@@ -197,6 +199,14 @@ test_product_rules if {
 	denies(trislab_with([object.union(corporate_site, {"maintainers": []})]), "needs at least one maintainer")
 	denies(trislab_with([object.union(corporate_site, {"maintainers": ["-bad-"]})]), "needs at least one maintainer")
 	denies(trislab_with([object.union(corporate_site, {"state": "archived"})]), "is archived and has no archived_on")
+}
+
+test_worker_without_template if {
+	count(denied(trislab_with([corporate_site, construction_product, form_handler]))) == 0
+	denies(trislab_with([corporate_site, object.union(form_handler, {"repo": "trislab-website-form-handler"})]), "trislab-website-form-handler has no template, so it is a worker and must be named trislab-worker-form-handler")
+	denies(trislab_with([corporate_site, object.union(form_handler, {"repo": "trislab-none-form-handler"})]), "must be named trislab-worker-form-handler")
+	denies(trislab_with([corporate_site, object.union(form_handler, {"template": "None"})]), "template is None")
+	denies(trislab_with([corporate_site, object.union(form_handler, {"template": "tl-template-worker"})]), "template is tl-template-worker")
 }
 
 test_product_slug_is_unique_within_its_tenant_only if {
