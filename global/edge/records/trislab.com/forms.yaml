@@ -1,0 +1,9 @@
+# The sender domain of the form handler (trislab-worker-form-handler), which
+# sends the sites' form submissions from obrazec@forms.trislab.com through
+# Resend, in the EU region (Amazon SES eu-west-1). A domain of its own, so form
+# mail can't harm the reputation of trislab.com's mail. forms.trislab.com itself
+# is the production Worker's Custom Domain (workers.tf), so no record here may
+# have that name.
+dkim-resend: { name: resend._domainkey.forms.trislab.com, type: TXT, content: "p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC2s79idqGISkcLyXYpt8xC2b1JPZyw8JcIlTwJPP/bpacJ1qJHijI0dR6hby0/8s7lqzGgSDMFiX0lVLrjgL3BdqDG/8JlOkzD42ZV2zvEEmtXuwNtJRodX1nfjQAS1hr0yMaCqcaoAmOE4hIVBuN0gc3TrIWD5AGOukvny85/zwIDAQAB" }
+send-mx: { name: send.forms.trislab.com, type: MX, priority: 10, content: feedback-smtp.eu-west-1.amazonses.com }
+send-spf: { name: send.forms.trislab.com, type: TXT, content: "v=spf1 include:amazonses.com ~all" }
