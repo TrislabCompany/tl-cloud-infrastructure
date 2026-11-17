@@ -86,3 +86,18 @@ moved {
   from = cloudflare_dns_record.this["dragonja.si/dragonja.si/apex"]
   to   = cloudflare_dns_record.pages["dragonja.si"]
 }
+
+# ldistragracisce.si moved from the hosting (records/ldistragracisce.si) to the
+# production of ldistragracisce-website-corporate-site, and
+# production.ldistragracisce.si became a redirect source there, as trislab.com
+# in #109. moved updates both records in place, so no apply creates a name
+# while its old record still exists.
+moved {
+  from = cloudflare_dns_record.this["ldistragracisce.si/ldistragracisce.si/apex"]
+  to   = cloudflare_dns_record.pages["ldistragracisce.si"]
+}
+
+moved {
+  from = cloudflare_dns_record.pages["production.ldistragracisce.si"]
+  to   = cloudflare_dns_record.this["ldistragracisce.si/ldistragracisce.si/production"]
+}

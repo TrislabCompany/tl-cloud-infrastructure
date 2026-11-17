@@ -115,7 +115,7 @@ tenants:
         environments:
           - { name: dev, hostname: dev.ldistragracisce.si }
           - { name: staging, hostname: staging.ldistragracisce.si }
-          - { name: production, hostname: production.ldistragracisce.si, web_analytics: true }   # ldistragracisce.si at the cutover
+          - { name: production, hostname: ldistragracisce.si, access: public, web_analytics: true }
   - slug: spds
     code: spd
     state: active

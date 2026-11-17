@@ -50,6 +50,7 @@ domains:
     tenant: ldistragracisce
     redirects:
       - { from: www.ldistragracisce.si, to: ldistragracisce.si }
+      - { from: production.ldistragracisce.si, to: ldistragracisce.si }
     dnssec: true
     bots: { fight_mode: false, block_ai: true }   # the site stays on the hosting until the cutover
   - name: spds.si
