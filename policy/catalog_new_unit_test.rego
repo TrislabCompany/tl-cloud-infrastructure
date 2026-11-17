@@ -199,6 +199,13 @@ test_product_rules if {
 	denies(trislab_with([object.union(corporate_site, {"state": "archived"})]), "is archived and has no archived_on")
 }
 
+test_product_without_template if {
+	count(denied(trislab_with([object.union(corporate_site, {"template": "none"}), construction_product]))) == 0
+	denies(trislab_with([object.union(corporate_site, {"template": "none", "repo": "trislab-none-corporate-site"})]), "has no template, so it must be named trislab-<website|webapp|saas>-corporate-site")
+	denies(trislab_with([object.union(corporate_site, {"template": "none", "repo": "trislab-website-hunting"})]), "has no template, so it must be named")
+	denies(trislab_with([object.union(corporate_site, {"template": "None"})]), "template is None")
+}
+
 test_product_slug_is_unique_within_its_tenant_only if {
 	denies(trislab_with([corporate_site, corporate_site]), "the tenant trislab has the product corporate-site more than once")
 	# construction is a product of two tenants.

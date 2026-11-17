@@ -1,6 +1,7 @@
 # The app repositories of catalog/products.yaml, one per product, created from their templates
 # (ADR 0038, 11-onboarding.md section 4.3). Each stamp whose apps[].repo names
-# a repository deploys from it.
+# a repository deploys from it. A product with template: none gets an empty
+# repository with only a first commit on main, which its team fills.
 
 locals {
   org     = "TrislabCompany"
@@ -98,9 +99,16 @@ resource "github_repository" "this" {
   # before it was switched on by hand once.
   delete_branch_on_merge = true
 
-  template {
-    owner      = local.org
-    repository = each.value.template
+  # Without a template the repository needs a first commit, so that main
+  # exists for CODEOWNERS and the ruleset below.
+  auto_init = each.value.template == "none"
+
+  dynamic "template" {
+    for_each = each.value.template == "none" ? [] : [each.value.template]
+    content {
+      owner      = local.org
+      repository = template.value
+    }
   }
 
   # The template is read only when the repository is created (07 section 11).
@@ -110,6 +118,7 @@ resource "github_repository" "this" {
   lifecycle {
     ignore_changes = [
       template,
+      auto_init,
       allow_merge_commit,
       allow_rebase_merge,
       allow_squash_merge,

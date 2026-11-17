@@ -69,7 +69,7 @@ schemas := {
 		"slug": slug, "code": `^[a-z]{2,3}$`, "state": `^(active|retired)$`, "products": "array",
 	}},
 	"products": {"file": "products.yaml", "section": 11, "required": {"slug", "repo", "template", "maintainers", "state", "domain"}, "fields": {
-		"slug": slug, "code": `^[a-z]{2,3}$`, "repo": slug, "template": `^tl-template-(website|webapp|saas)$`,
+		"slug": slug, "code": `^[a-z]{2,3}$`, "repo": slug, "template": `^(tl-template-(website|webapp|saas)|none)$`,
 		"maintainers": "array", "state": `^(active|archived)$`, "archived_on": `^[0-9]{4}-[0-9]{2}-[0-9]{2}$`,
 		"domain": fqdn, "environments": "array",
 	}},
@@ -308,9 +308,20 @@ deny contains msg if {
 deny contains msg if {
 	some [t, p] in product_rows
 	is_string(p.template)
+	p.template != "none"
 	want := sprintf("%v-%v-%v", [t.slug, trim_prefix(p.template, "tl-template-"), p.slug])
 	p.repo != want
 	msg := sprintf("catalog/products.yaml: %v must be named %v, from its tenant, its template and its product (07 section 11)", [p.repo, want])
+}
+
+# A repository without a template (template: none) starts empty, and is still
+# named <tenant>-<website|webapp|saas>-<product>, after what it serves.
+deny contains msg if {
+	some [t, p] in product_rows
+	p.template == "none"
+	is_string(p.repo)
+	not regex.match(sprintf("^%v-(website|webapp|saas)-%v$", [t.slug, p.slug]), p.repo)
+	msg := sprintf("catalog/products.yaml: %v has no template, so it must be named %v-<website|webapp|saas>-%v, from its tenant, what it serves and its product (07 section 11)", [p.repo, t.slug, p.slug])
 }
 
 deny contains msg if {

@@ -16,7 +16,8 @@
 #   slug        the product's id
 #   code        2-3 letters, never reused; only needed when a stamp deploys the product
 #   repo        <tenant>-<website|webapp|saas>-<slug>; global/github creates it from its template
-#   template    tl-template-website | tl-template-webapp | tl-template-saas
+#   template    tl-template-website | tl-template-webapp | tl-template-saas | none
+#               (none: an empty repository with a first commit, which its team fills)
 #   maintainers GitHub user names of the team <tenant>-<slug>
 #   state       active | archived (+ archived_on)
 #   domain      a domain of catalog/domains.yaml, owned by the same tenant
@@ -60,6 +61,12 @@ tenants:
           - { name: dev, hostname: dev.dragonja.si }
           - { name: staging, hostname: staging.dragonja.si }
           - { name: production, hostname: dragonja.si, access: public }
+      - slug: form-handler     # the shared form Worker of the sites on Pages (D-14); its environments come with the worker kind
+        repo: trislab-website-form-handler
+        template: none
+        maintainers: [tl-janskof]
+        state: active
+        domain: trislab.com
   - slug: astragroup
     code: ast
     state: active
