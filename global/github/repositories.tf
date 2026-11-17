@@ -34,6 +34,10 @@ locals {
         maintainers  = p.maintainers
         state        = p.state
         environments = try(p.environments, [])
+        # A shared service on Cloudflare Workers (workers.tf), and whether it
+        # is the sites' form endpoint, which gets their Turnstile secrets.
+        worker = contains(["none", "tl-template-worker"], p.template)
+        forms  = try(p.forms, false)
       } if p.state == "active"
     }
   ]...)

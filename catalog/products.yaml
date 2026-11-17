@@ -23,8 +23,20 @@
 #   maintainers GitHub user names of the team <tenant>-<slug>
 #   state       active | archived (+ archived_on)
 #   domain      a domain of catalog/domains.yaml, owned by the same tenant
-#   environments  Cloudflare Pages environments, for a tl-template-website repository
-#               that no stamp deploys from. global/edge creates the Pages project,
+#   forms       true on the one worker that is the sites' form endpoint (D-32):
+#               global/github writes the Turnstile secret of every site environment
+#               with turnstile: true into its Environment of the same name, as
+#               TURNSTILE_SECRET_<REPO>, and gives each such site environment the
+#               worker's address as PUBLIC_FORMS_URL. Optional, a worker only
+#   environments  For a worker: { name, hostname } per environment, nothing else.
+#               global/edge creates the Worker <name>-<product>-<tenant> (the
+#               repository's workflows deploy its code with wrangler) and its
+#               hostname as a Workers Custom Domain, always public: browsers post
+#               to it from the sites. global/github creates the GitHub Environment
+#               of the same name, with CLOUDFLARE_ACCOUNT_ID, WORKER_NAME and
+#               WORKER_URL and the secret CLOUDFLARE_API_TOKEN (Workers Scripts
+#               Write). Otherwise, Cloudflare Pages environments, for a
+#               tl-template-website repository that no stamp deploys from. global/edge creates the Pages project,
 #               named after the repository, and for each environment its custom
 #               hostname (the domain or one label below it), a proxied CNAME to the
 #               Pages branch of the same name (production is the project's
