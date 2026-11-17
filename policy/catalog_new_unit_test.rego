@@ -842,8 +842,8 @@ test_staging_can_never_be_public if {
 }
 
 test_site_repository if {
-	denies(with_site({"template": "tl-template-saas", "repo": "trislab-saas-hunting"}), "has environments, which only an active tl-template-website repository can have")
-	denies(with_site({"state": "archived", "archived_on": "2026-11-01"}), "has environments, which only an active tl-template-website repository can have")
+	denies(with_site({"template": "tl-template-saas", "repo": "trislab-saas-hunting"}), "has environments, which only an active tl-template-website repository or worker can have")
+	denies(with_site({"state": "archived", "archived_on": "2026-11-01"}), "has environments, which only an active tl-template-website repository or worker can have")
 	pr := object.union(with_site({}), {"stamp_yaml": object.union(good.stamp_yaml, {"products-sandbox-neu/hunting": stamp("construction", "trislab-website-hunting")})})
 	denies(pr, "so no stamp may deploy from it, but stamps/products-sandbox-neu/hunting/stamp.yaml does")
 }
@@ -858,4 +858,46 @@ test_site_hostnames if {
 
 test_site_hostname_may_be_the_domain_itself if {
 	count([msg | some msg in denied(with_site_hostname("trislab.com")); contains(msg, "label below")]) == 0
+}
+
+# ---- products.yaml, a worker's environments ----
+
+worker_environments := [
+	{"name": "dev", "hostname": "forms-dev.trislab.com"},
+	{"name": "staging", "hostname": "forms-staging.trislab.com"},
+	{"name": "production", "hostname": "forms.trislab.com"},
+]
+
+with_worker(extra) := trislab_with([corporate_site, construction_product, object.union(form_handler, extra)])
+
+test_worker_with_environments_passes if {
+	count(denied(with_worker({"environments": worker_environments, "forms": true}))) == 0
+	count(denied(with_worker({"environments": worker_environments}))) == 0
+}
+
+test_worker_environment_is_name_and_hostname_only if {
+	denies(with_worker({"environments": [{"name": "dev", "hostname": "forms-dev.trislab.com", "access": "protected"}]}), "environments[0] of the worker trislab-worker-form-handler has access; a worker's environment is only { name, hostname }")
+	denies(with_worker({"environments": [{"name": "production", "hostname": "forms.trislab.com", "turnstile": true, "web_analytics": true}]}), "has turnstile, web_analytics;")
+	denies(with_worker({"environments": [{"name": "prod", "hostname": "forms.trislab.com"}]}), "environments[0] of the site trislab-worker-form-handler must be")
+}
+
+test_worker_hostnames if {
+	denies(with_worker({"environments": [{"name": "dev", "hostname": "forms.dev.trislab.com"}]}), "is not trislab.com or exactly one label below it")
+	denies(with_worker({"environments": [{"name": "dev", "hostname": "prod-corporate-site.trislab.com"}]}), "the hostname prod-corporate-site.trislab.com is used more than once")
+}
+
+test_archived_worker_has_no_environments if {
+	denies(with_worker({"environments": worker_environments, "state": "archived", "archived_on": "2026-12-01"}), "has environments, which only an active tl-template-website repository or worker can have")
+}
+
+test_forms_only_on_a_worker if {
+	denies(with_site({"forms": true}), "trislab-website-hunting has forms: true, which only a worker can have")
+	denies(with_worker({"forms": "yes"}), "forms is yes, which is not allowed")
+	count(denied(with_site({"forms": false}))) == 0
+}
+
+test_one_forms_worker_at_most if {
+	pdf := object.union(form_handler, {"slug": "pdf", "repo": "trislab-worker-pdf", "forms": true})
+	denies(trislab_with([corporate_site, construction_product, object.union(form_handler, {"forms": true}), pdf]), "trislab-worker-form-handler, trislab-worker-pdf all have forms: true, which at most one active worker can have")
+	count(denied(trislab_with([corporate_site, construction_product, object.union(form_handler, {"forms": true}), object.union(pdf, {"forms": false})]))) == 0
 }

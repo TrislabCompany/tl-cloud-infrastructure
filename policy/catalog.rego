@@ -71,7 +71,7 @@ schemas := {
 	"products": {"file": "products.yaml", "section": 11, "required": {"slug", "repo", "template", "maintainers", "state", "domain"}, "fields": {
 		"slug": slug, "code": `^[a-z]{2,3}$`, "repo": slug, "template": `^(tl-template-(website|webapp|saas)|none)$`,
 		"maintainers": "array", "state": `^(active|archived)$`, "archived_on": `^[0-9]{4}-[0-9]{2}-[0-9]{2}$`,
-		"domain": fqdn, "environments": "array",
+		"domain": fqdn, "environments": "array", "forms": "boolean",
 	}},
 	"owners": {"file": "owners.yaml", "section": 9, "required": {"slug", "kind", "code", "state"}, "fields": {
 		"slug": slug, "kind": `^(customer|product)$`, "code": `^[a-z]{2,3}$`, "state": `^(active|retired)$`,
@@ -447,8 +447,40 @@ deny contains msg if {
 	some [_, p] in product_rows
 	is_array(p.environments)
 	count(p.environments) > 0
-	not [p.template, p.state] == ["tl-template-website", "active"]
-	msg := sprintf("catalog/products.yaml: %v has environments, which only an active tl-template-website repository can have (07 section 11)", [p.repo])
+	not [p.template, p.state] in {["tl-template-website", "active"], ["none", "active"]}
+	msg := sprintf("catalog/products.yaml: %v has environments, which only an active tl-template-website repository or worker can have (07 section 11)", [p.repo])
+}
+
+# ---- Environments: workers on Cloudflare Workers (D-33) ----
+
+# A worker's environment is only { name, hostname }. Its hostname is public:
+# browsers post forms to it from the sites, so Cloudflare Access can't stand in
+# front of it, and it has no Web Analytics or Turnstile widget of its own.
+deny contains msg if {
+	some [_, p] in product_rows
+	p.template == "none"
+	is_array(p.environments)
+	some i, e in p.environments
+	is_object(e)
+	extra := object.keys(e) - {"name", "hostname"}
+	count(extra) > 0
+	msg := sprintf("catalog/products.yaml: environments[%d] of the worker %v has %v; a worker's environment is only { name, hostname }, and its hostname is always public (D-33)", [i, p.repo, concat(", ", sort(extra))])
+}
+
+# forms: true marks the form endpoint of the sites: global/github gives it the
+# sites' Turnstile secrets. Only a worker can be one.
+deny contains msg if {
+	some [_, p] in product_rows
+	p.forms == true
+	p.template != "none"
+	msg := sprintf("catalog/products.yaml: %v has forms: true, which only a worker can have (D-33)", [p.repo])
+}
+
+# The sites get one form endpoint per environment, so one worker at most is it.
+deny contains msg if {
+	forms := [p.repo | some [_, p] in product_rows; p.forms == true; p.state == "active"]
+	count(forms) > 1
+	msg := sprintf("catalog/products.yaml: %v all have forms: true, which at most one active worker can have (D-33)", [concat(", ", sort(forms))])
 }
 
 # A repository deploys either to Cloudflare Pages or to stamps.

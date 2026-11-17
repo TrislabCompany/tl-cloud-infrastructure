@@ -8,7 +8,7 @@
 locals {
   pages = {
     for repo, r in local.repos : repo => { repo = repo, environments = r.environments }
-    if length(r.environments) > 0
+    if length(r.environments) > 0 && !r.worker
   }
 
   pages_environments = merge([
@@ -18,19 +18,29 @@ locals {
         environment = e.name
         production  = e.name == "production"
         hostname    = e.hostname
+        turnstile   = try(e.turnstile, false)
       }
     }
   ]...)
 
   # No variable switches indexing: since template-website/v0.3.0 no build is
   # marked noindex, and Cloudflare Access keeps dev and staging away from search engines.
+  #
+  # A site with a form (turnstile: true) also gets the public site key of its
+  # widget, and the address of the form endpoint of the same environment once
+  # the forms worker has one (workers.tf). Both are PUBLIC_, so the build puts
+  # them into the page (tl-template-website docs/forms.md).
   pages_variables = merge([
     for key, e in local.pages_environments : {
-      for name, value in {
-        CLOUDFLARE_ACCOUNT_ID = var.cloudflare_account_id
-        PAGES_PROJECT         = e.repo
-        SITE_URL              = "https://${e.hostname}"
-      } : "${key}/${name}" => { environment = key, name = name, value = value }
+      for name, value in merge(
+        {
+          CLOUDFLARE_ACCOUNT_ID = var.cloudflare_account_id
+          PAGES_PROJECT         = e.repo
+          SITE_URL              = "https://${e.hostname}"
+        },
+        e.turnstile && contains(keys(local.turnstile_widgets), key) ? { PUBLIC_TURNSTILE_SITE_KEY = local.turnstile_widgets[key].sitekey } : {},
+        e.turnstile && contains(keys(local.forms_urls), e.environment) ? { PUBLIC_FORMS_URL = local.forms_urls[e.environment] } : {},
+      ) : "${key}/${name}" => { environment = key, name = name, value = value }
     }
   ]...)
 }

@@ -1,5 +1,5 @@
 # The sites on Cloudflare Pages, the products with environments in
-# catalog/products.yaml: one Direct
+# catalog/products.yaml that are not workers (workers.tf): one Direct
 # Upload project per repository, deployed by the repository's own workflows
 # with wrangler. Each environment is a Pages branch of the same name, served
 # on its hostname: production is the project's production branch, and dev or
@@ -14,7 +14,7 @@ locals {
   pages = merge([
     for t in local.tenants : {
       for p in t.products : p.repo => { repo = p.repo, environments = p.environments, owner = try(t.code, "trislab") }
-      if try(p.environments, null) != null
+      if try(p.environments, null) != null && !contains(local.worker_templates, p.template)
     }
   ]...)
 
