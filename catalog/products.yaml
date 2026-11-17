@@ -15,8 +15,11 @@
 # products[] (the slug is unique within its tenant)
 #   slug        the product's id
 #   code        2-3 letters, never reused; only needed when a stamp deploys the product
-#   repo        <tenant>-<website|webapp|saas>-<slug>; global/github creates it from its template
-#   template    tl-template-website | tl-template-webapp | tl-template-saas
+#   repo        <tenant>-<website|webapp|saas>-<slug>; global/github creates it from its template.
+#               A shared service on Cloudflare Workers is <tenant>-worker-<slug>
+#   template    tl-template-website | tl-template-webapp | tl-template-saas | none
+#               (none: only for a worker, until tl-template-worker exists; an empty
+#               repository with a first commit, which its team fills)
 #   maintainers GitHub user names of the team <tenant>-<slug>
 #   state       active | archived (+ archived_on)
 #   domain      a domain of catalog/domains.yaml, owned by the same tenant
