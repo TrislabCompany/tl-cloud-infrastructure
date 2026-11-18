@@ -99,7 +99,7 @@ tenants:
         environments:
           - { name: dev, hostname: dev.astragroup.si }
           - { name: staging, hostname: staging.astragroup.si }
-          - { name: production, hostname: production.astragroup.si, web_analytics: true }   # astragroup.si at the cutover
+          - { name: production, hostname: astragroup.si, access: public, web_analytics: true }
       - slug: strehanakljuc
         repo: astragroup-website-strehanakljuc
         template: tl-template-website

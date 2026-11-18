@@ -1,9 +1,8 @@
 # The records of astragroup.si, from NeoServ's zone export of 2026-11-16
 # (ns33/ns34.neoserv.si), checked against ns33.neoserv.si and cleaned up. The
-# site is on NeoServ's web hosting 152.89.234.70 until the cutover to Pages. The
-# mail stays on NeoServ's mail server 152.89.235.115 (eh3.neoserv.si), which has
-# its own certificates for mail and webmail. The web hosting has a valid
-# certificate for the site, so its web names are proxied; the rest are DNS-only.
+# site has moved from NeoServ's web hosting 152.89.234.70 to Pages. The mail
+# stays on NeoServ's mail server 152.89.235.115 (eh3.neoserv.si), which has its
+# own certificates for mail and webmail. The hosting's names are DNS-only.
 #
 # Not copied from NeoServ:
 # - whm and webdisk: WHM isn't open to a shared-hosting account, and WebDisk
@@ -18,9 +17,14 @@
 # ip4, a and mx terms were already in it, and a would let the apex's address
 # (Cloudflare, then Pages) send mail. A DMARC record is added; NeoServ had none.
 
-# The site and the web hosting, until the cutover.
-apex: { name: astragroup.si, type: A, content: 152.89.234.70, proxied: true }
+# The site is the production of the Pages site
+# astragroup-website-corporate-site: its apex record comes from
+# catalog/products.yaml (pages.tf). www and production only carry the
+# redirects to astragroup.si in catalog/domains.yaml.
 www: { name: www.astragroup.si, type: CNAME, content: astragroup.si, proxied: true }
+production: { name: production.astragroup.si, type: CNAME, content: astragroup.si, proxied: true }
+
+# The web hosting.
 ftp: { name: ftp.astragroup.si, type: A, content: 152.89.234.70 }
 cpanel: { name: cpanel.astragroup.si, type: A, content: 152.89.234.70 }
 
