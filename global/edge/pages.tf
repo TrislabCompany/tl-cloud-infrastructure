@@ -101,3 +101,16 @@ moved {
   from = cloudflare_dns_record.pages["production.ldistragracisce.si"]
   to   = cloudflare_dns_record.this["ldistragracisce.si/ldistragracisce.si/production"]
 }
+
+# astragroup.si moved from NeoServ's hosting (records/astragroup.si) to the
+# production of astragroup-website-corporate-site, and production.astragroup.si
+# became a redirect source, in place as ldistragracisce.si above.
+moved {
+  from = cloudflare_dns_record.this["astragroup.si/astragroup.si/apex"]
+  to   = cloudflare_dns_record.pages["astragroup.si"]
+}
+
+moved {
+  from = cloudflare_dns_record.pages["production.astragroup.si"]
+  to   = cloudflare_dns_record.this["astragroup.si/astragroup.si/production"]
+}
