@@ -69,7 +69,7 @@ schemas := {
 		"slug": slug, "code": `^[a-z]{2,3}$`, "state": `^(active|retired)$`, "products": "array",
 	}},
 	"products": {"file": "products.yaml", "section": 11, "required": {"slug", "repo", "template", "maintainers", "state", "domain"}, "fields": {
-		"slug": slug, "code": `^[a-z]{2,3}$`, "repo": slug, "template": `^(tl-template-(website|webapp|saas)|none)$`,
+		"slug": slug, "code": `^[a-z]{2,3}$`, "repo": slug, "template": `^(tl-template-website|tl-product-(webapp|saas)|none)$`,
 		"maintainers": "array", "state": `^(active|archived)$`, "archived_on": `^[0-9]{4}-[0-9]{2}-[0-9]{2}$`,
 		"domain": fqdn, "environments": "array", "forms": "boolean",
 	}},
@@ -304,12 +304,13 @@ deny contains msg if {
 	msg := sprintf("catalog/products.yaml: the %s %v is used by more than one product or client tenant with a code (07 section 9)", [key, v])
 }
 
-# <tenant>-<appType>-<product>.
+# <tenant>-<appType>-<product>, where the app type is the template's last word:
+# tl-template-website, tl-product-webapp, tl-product-saas.
 deny contains msg if {
 	some [t, p] in product_rows
 	is_string(p.template)
 	p.template != "none"
-	want := sprintf("%v-%v-%v", [t.slug, trim_prefix(p.template, "tl-template-"), p.slug])
+	want := sprintf("%v-%v-%v", [t.slug, trim_prefix(trim_prefix(p.template, "tl-template-"), "tl-product-"), p.slug])
 	p.repo != want
 	msg := sprintf("catalog/products.yaml: %v must be named %v, from its tenant, its template and its product (07 section 11)", [p.repo, want])
 }

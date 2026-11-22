@@ -13,7 +13,7 @@ corporate_site := {"slug": "corporate-site", "code": "web", "repo": "trislab-web
 
 form_handler := {"slug": "form-handler", "repo": "trislab-worker-form-handler", "template": "none", "maintainers": ["octo-anna"], "state": "active", "domain": "trislab.com"}
 
-construction_product := {"slug": "construction", "code": "con", "repo": "trislab-saas-construction", "template": "tl-template-saas", "maintainers": ["octo-anna", "octo-marko"], "state": "active", "domain": "construction.com"}
+construction_product := {"slug": "construction", "code": "con", "repo": "trislab-saas-construction", "template": "tl-product-saas", "maintainers": ["octo-anna", "octo-marko"], "state": "active", "domain": "construction.com"}
 
 # catalog/products.yaml: trislab has no code, a client tenant has one, and a
 # product has one only when a stamp deploys it. construction is a product of
@@ -21,7 +21,7 @@ construction_product := {"slug": "construction", "code": "con", "repo": "trislab
 tenant_list := [
 	{"slug": "trislab", "state": "active", "products": [corporate_site, construction_product]},
 	{"slug": "okna-capris", "code": "oc", "state": "active", "products": [
-		{"slug": "construction", "repo": "okna-capris-webapp-construction", "template": "tl-template-webapp", "maintainers": ["octo-marko"], "state": "archived", "archived_on": "2026-09-01", "domain": "okna-capris.example"},
+		{"slug": "construction", "repo": "okna-capris-webapp-construction", "template": "tl-product-webapp", "maintainers": ["octo-marko"], "state": "archived", "archived_on": "2026-09-01", "domain": "okna-capris.example"},
 	]},
 	{"slug": "astra-group", "code": "asg", "state": "active", "products": []},
 ]
@@ -194,7 +194,10 @@ test_trislab_has_no_code_and_a_client_has_one if {
 test_product_rules if {
 	denies(trislab_with([object.union(corporate_site, {"repo": "corporate-site"})]), "corporate-site must be named trislab-website-corporate-site")
 	denies(trislab_with([object.union(corporate_site, {"slug": "hunting"})]), "must be named trislab-website-hunting")
-	denies(trislab_with([object.union(corporate_site, {"template": "tl-template-saas"})]), "must be named trislab-saas-corporate-site")
+	denies(trislab_with([object.union(corporate_site, {"template": "tl-product-saas"})]), "must be named trislab-saas-corporate-site")
+	denies(trislab_with([object.union(corporate_site, {"template": "tl-product-webapp"})]), "must be named trislab-webapp-corporate-site")
+	denies(trislab_with([object.union(corporate_site, {"template": "tl-template-saas"})]), "template is tl-template-saas, which is not allowed")
+	denies(trislab_with([object.union(corporate_site, {"template": "tl-template-webapp"})]), "template is tl-template-webapp, which is not allowed")
 	denies(with_list("tenants", [tenant_list[0], object.union(tenant_list[1], {"products": [object.union(tenant_list[1].products[0], {"repo": "trislab-webapp-construction"})]}), tenant_list[2]]), "must be named okna-capris-webapp-construction")
 	denies(trislab_with([object.union(corporate_site, {"maintainers": []})]), "needs at least one maintainer")
 	denies(trislab_with([object.union(corporate_site, {"maintainers": ["-bad-"]})]), "needs at least one maintainer")
@@ -842,7 +845,7 @@ test_staging_can_never_be_public if {
 }
 
 test_site_repository if {
-	denies(with_site({"template": "tl-template-saas", "repo": "trislab-saas-hunting"}), "has environments, which only an active tl-template-website repository or worker can have")
+	denies(with_site({"template": "tl-product-saas", "repo": "trislab-saas-hunting"}), "has environments, which only an active tl-template-website repository or worker can have")
 	denies(with_site({"state": "archived", "archived_on": "2026-11-01"}), "has environments, which only an active tl-template-website repository or worker can have")
 	pr := object.union(with_site({}), {"stamp_yaml": object.union(good.stamp_yaml, {"products-sandbox-neu/hunting": stamp("construction", "trislab-website-hunting")})})
 	denies(pr, "so no stamp may deploy from it, but stamps/products-sandbox-neu/hunting/stamp.yaml does")

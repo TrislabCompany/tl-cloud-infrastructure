@@ -18,8 +18,8 @@ The same block starts the `AGENTS.md` of every Trislab repository, so an agent i
 - **Never contains:** app code; reusable modules, stamp templates or app workflows; product plans or decisions; secrets or personal data.
 - **A change goes elsewhere when it is:**
   - a reusable module, stamp template, building block or app workflow: `tl-platform`;
-  - a framework building block or reusable module: `tl-framework` (today `tl-template-saas`);
-  - starter scaffolding: `tl-product-saas` (not created yet), `tl-product-webapp` (today `tl-template-webapp`) or `tl-template-website`;
+  - a framework building block or reusable module: `tl-framework`;
+  - starter scaffolding: `tl-product-saas` (not created yet), `tl-product-webapp` or `tl-template-website`;
   - a product's own code: its product repository;
   - a product idea, plan, decision or hand-off plan: `tl-product-ideas` (private).
 - **Repositories:** this is the only place a product repository is created, by an onboarding PR and then `/apply`. The exception is the factory repositories (`tl-framework`, `tl-product-saas`, `tl-product-webapp`), which are renamed or created once with `gh`, outside this repository.
