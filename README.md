@@ -1,1 +1,3 @@
 # tl-cloud-infrastructure
+
+The live cloud of the Trislab platform. It has the registers of tenants, products and domains in `catalog/`, the platform's own Azure resources, the landing zones, the environment stamps, the Cloudflare edge and the app repositories on GitHub. Each one is described by a file here and applied by the pipeline from a pull request, with `/apply` before the merge. The modules it pins come from `tl-platform`. Every product repository is created here, by an onboarding pull request. Start with [AGENTS.md](AGENTS.md): its Role section says what belongs here and where everything else goes.

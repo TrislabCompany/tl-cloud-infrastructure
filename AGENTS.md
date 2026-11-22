@@ -4,6 +4,31 @@
 
 This file is the guide for every AI coding tool (Claude Code, Cursor, Codex, …). `CLAUDE.md` only imports it: edit the conventions here. The platform spec (`docs/spec/v2/`) is git-ignored and is not in a fresh clone, so this file and the skills carry the rules they need. Where the spec is named, ask a member of `devops` for it when you don't have the local copy.
 
+## Role
+
+The same block starts the `AGENTS.md` of every Trislab repository, so an agent in any of them knows where a change belongs.
+
+- **For:** the live cloud of the Trislab platform. Every resource is described by a file here and applied by the pipeline from a PR.
+- **Contains:**
+  - the registers in `catalog/` (`products.yaml`, `domains.yaml` and the others);
+  - the platform's own Azure resources, the landing zones and the stamps, including the sandbox stamps of the starters `tl-product-saas` and `tl-product-webapp`;
+  - the Cloudflare edge;
+  - the app repositories with their teams, Environments and secrets (`global/github`);
+  - the platform spec in `docs/spec/v2/`, which is local and never pushed.
+- **Never contains:** app code; reusable modules, stamp templates or app workflows; product plans or decisions; secrets or personal data.
+- **A change goes elsewhere when it is:**
+  - a reusable module, stamp template, building block or app workflow: `tl-platform`;
+  - a framework building block or reusable module: `tl-framework` (today `tl-template-saas`);
+  - starter scaffolding: `tl-product-saas` (not created yet), `tl-product-webapp` (today `tl-template-webapp`) or `tl-template-website`;
+  - a product's own code: its product repository;
+  - a product idea, plan, decision or hand-off plan: `tl-product-ideas` (private).
+- **Repositories:** this is the only place a product repository is created, by an onboarding PR and then `/apply`. The exception is the factory repositories (`tl-framework`, `tl-product-saas`, `tl-product-webapp`), which are renamed or created once with `gh`, outside this repository.
+- **Released as:** not released. Each PR is applied with `/apply` before it merges.
+- **Skills:** `.agents/skills/`, listed under [Skills](#skills).
+- **Scripts:** the helpers in `.agents/skills/_shared/` (`ipam.py`, `check-catalog.py`, `check-skills.py`). Each skill names the one it uses.
+  - Add a script there when the same kind of work comes back and a script makes it faster and cheaper in tokens. Write none for one-off work.
+  - A script prints a summary and the errors, not a dump.
+
 ## Repository map
 
 | Path | What | Layer, Environment |
