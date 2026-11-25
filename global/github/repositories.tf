@@ -104,6 +104,12 @@ resource "github_repository" "this" {
   # before it was switched on by hand once.
   delete_branch_on_merge = true
 
+  # Renovate and the template update put their PRs on auto-merge: a PR merges
+  # once a person approves it and the required checks pass (tl-product-ideas
+  # D-40). Set, like delete_branch_on_merge, only when the repository is
+  # created; a repository created before it was switched on by hand once.
+  allow_auto_merge = true
+
   # Without a template the repository needs a first commit, so that main
   # exists for CODEOWNERS and the ruleset below.
   auto_init = each.value.template == "none"
@@ -119,7 +125,8 @@ resource "github_repository" "this" {
   # The template is read only when the repository is created (07 section 11).
   # tl-github-plan can't read the merge settings, so they would always show as
   # changing; the repository keeps GitHub's defaults (ADR 0038), except
-  # delete_branch_on_merge above, or what its team sets in its settings.
+  # delete_branch_on_merge and allow_auto_merge above, or what its team sets
+  # in its settings.
   lifecycle {
     ignore_changes = [
       template,
@@ -132,6 +139,7 @@ resource "github_repository" "this" {
       squash_merge_commit_title,
       squash_merge_commit_message,
       delete_branch_on_merge,
+      allow_auto_merge,
     ]
   }
 }
