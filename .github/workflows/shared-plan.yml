@@ -127,7 +127,7 @@ jobs:
         # tl-github-plan: the github provider of global/github reads the organization's
         # repositories, so its token isn't limited to this one (ADR 0038).
         if: contains(fromJSON('["stamps","landingzones"]'), steps.layer.outputs.layer) || inputs.root == 'global/edge' || inputs.root == 'global/github'
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         with:
           client-id: ${{ inputs.root == 'global/github' && vars.GH_PLAN_APP_ID || vars.LZ_PLAN_APP_ID }}
           private-key: ${{ inputs.root == 'global/github' && secrets.GH_PLAN_APP_KEY || secrets.LZ_PLAN_APP_KEY }}
