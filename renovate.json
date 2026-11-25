@@ -1,6 +1,46 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
+  "description": "tl-platform's default (weekly, grouped, digests pinned, auto-merge once a person approves and the required checks pass), plus OpenTofu, its providers and the landing-zone module. A provider bump changes a root, so it is planned and needs /apply like any other change.",
+  "extends": ["github>TrislabCompany/tl-platform//renovate/default"],
+  "ignorePaths": ["stamps/**"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "The OpenTofu version every root's plan and apply install.",
+      "managerFilePatterns": ["/(^|/)\\.opentofu-version$/"],
+      "matchStrings": ["^(?<currentValue>\\d+\\.\\d+\\.\\d+)\\s*$"],
+      "depNameTemplate": "opentofu",
+      "packageNameTemplate": "opentofu/opentofu",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>\\d+\\.\\d+\\.\\d+)$"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "OpenTofu itself and the providers of every root, in one PR.",
+      "matchManagers": ["terraform"],
+      "matchDepTypes": ["provider", "required_provider"],
+      "groupName": "OpenTofu providers"
+    },
+    {
+      "matchManagers": ["custom.regex"],
+      "matchPackageNames": ["opentofu/opentofu"],
+      "groupName": "OpenTofu providers"
+    },
+    {
+      "description": "The tl-platform modules, pinned by <module>/vX.Y.Z. Renovate shows a new release on the Dependency Dashboard and opens the PR only when a devops member ticks it, because a module bump rolls out ring by ring (.claude/rules/coding-hcl.md). Never a major, which needs caller changes.",
+      "matchManagers": ["terraform"],
+      "matchDepTypes": ["module"],
+      "matchPackageNames": ["TrislabCompany/tl-platform", "github.com/TrislabCompany/tl-platform", "https://github.com/TrislabCompany/tl-platform.git"],
+      "versioning": "regex:^(?<compatibility>[a-z-]+)/v(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$",
+      "dependencyDashboardApproval": true
+    },
+    {
+      "matchManagers": ["terraform"],
+      "matchDepTypes": ["module"],
+      "matchPackageNames": ["TrislabCompany/tl-platform", "github.com/TrislabCompany/tl-platform", "https://github.com/TrislabCompany/tl-platform.git"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    }
   ]
 }

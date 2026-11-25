@@ -1,0 +1,13 @@
+// The Markdown rules the plan's `lint markdown` job checks: the same as the
+// default of tl-platform's app-ci.yml (tl-product-ideas D-40).
+{
+  "config": {
+    "default": true,
+    "MD013": false,
+    "MD024": { "siblings_only": true },
+    "MD033": false,
+    "MD041": false,
+    "MD060": false
+  },
+  "ignores": ["docs/spec/**"]
+}
