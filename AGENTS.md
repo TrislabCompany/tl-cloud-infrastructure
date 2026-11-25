@@ -41,6 +41,8 @@ The same block starts the `AGENTS.md` of every Trislab repository, so an agent i
 | `catalog/` | `regions.yaml`, `ipam.yaml`, `products.yaml` (tenants and their products), `domains.yaml` (domains and `stamp_tenants`), `cloudflare-ips.yaml`: the registers every layer reads | Whichever roots read the changed entry |
 | `policy/` | The rego rules the PR's plan runs (`catalog`, `naming`, `regions`, `tags`, `trusted-code`) and their unit tests | — |
 | `.github/workflows/`, `.github/scripts/` | The pipeline: plan on every PR, `/apply`, drift, stamp check | — |
+| `renovate.json` | Renovate: tl-platform's default preset, plus OpenTofu, the providers and the `tl-platform` modules. A module bump waits on the Dependency Dashboard until a `devops` member ticks it; stamps are never touched, a stamp PR moves them | — |
+| `.markdownlint-cli2.jsonc` | The rules for changed Markdown, checked by the plan's `lint markdown` job | — |
 | `.agents/skills/` | The skills below; the only place skills are written. `.agents/skills/_shared/` holds the steps and scripts every skill uses | — |
 | `.claude/rules/` | The coding rules, loaded by path (below) | — |
 | `.claude/skills/` | One pointer per skill, with the same front matter, so that Claude Code lists it | — |

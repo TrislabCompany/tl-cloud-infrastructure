@@ -2,7 +2,9 @@ name: Pull Request Plan
 
 # Plans every root a PR touches, each with its layer's plan identity, and runs
 # the checks (08 sections 2 to 4). The summary jobs `plan` and `conftest` are
-# required checks on main; they pass when there is nothing to check.
+# required checks on main; they pass when there is nothing to check. Changed
+# Markdown is linted with markdownlint-cli2 and .markdownlint-cli2.jsonc, the
+# same check as tl-platform's app-ci.yml (tl-product-ideas D-40).
 
 on:
   pull_request:
@@ -18,6 +20,7 @@ env:
   CONFTEST_VERSION: 0.71.0
   ACTIONLINT_VERSION: 1.7.12
   RUFF_VERSION: 0.17.4
+  MARKDOWNLINT_VERSION: 0.24.0
 
 jobs:
   detect:
@@ -30,6 +33,7 @@ jobs:
       policy: ${{ steps.detect.outputs.policy }}
       workflows: ${{ steps.detect.outputs.workflows }}
       python: ${{ steps.detect.outputs.python }}
+      markdown: ${{ steps.detect.outputs.markdown }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -51,6 +55,7 @@ jobs:
             echo "policy=$(grep -q '^policy/' <<< "$changed" && echo true || echo false)"
             echo "workflows=$(grep -qE '^(\.github/|renovate\.json$)' <<< "$changed" && echo true || echo false)"
             echo "python=$(grep -qE '(\.py|^ruff\.toml)$' <<< "$changed" && echo true || echo false)"
+            echo "markdown=$(grep -qE '(\.md|^\.markdownlint-cli2\.jsonc)$' <<< "$changed" && echo true || echo false)"
           } >> "$GITHUB_OUTPUT"
 
   roots:
@@ -121,16 +126,42 @@ jobs:
       - run: ruff check --output-format github .
       - run: ruff format --check .
 
+  markdown:
+    name: lint markdown
+    needs: detect
+    if: needs.detect.outputs.markdown == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      # Only the files the PR adds or changes, so an old file is fixed when it
+      # is next touched. npx installs the exact version and npm checks its
+      # integrity against the registry.
+      - env:
+          BASE: origin/${{ github.event.pull_request.base.ref }}
+        run: |
+          mapfile -t files < <(git diff --name-only --diff-filter=d "$(git merge-base "$BASE" HEAD)" HEAD -- '*.md' | sed 's|^|./|')
+          if [ "${#files[@]}" = 0 ]; then
+            echo "::notice::No Markdown changed"
+            exit 0
+          fi
+          npx --yes "markdownlint-cli2@$MARKDOWNLINT_VERSION" "${files[@]}"
+
   plan:
     name: plan
-    needs: [detect, roots, lint, python]
+    needs: [detect, roots, lint, python, markdown]
     if: always()
     runs-on: ubuntu-24.04
     steps:
       - env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
-          echo "detect, roots, lint, python: $RESULTS"
+          echo "detect, roots, lint, python, markdown: $RESULTS"
           if grep -qE 'failure|cancelled' <<< "$RESULTS"; then exit 1; fi
 
   conftest:
